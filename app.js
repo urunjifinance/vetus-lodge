@@ -208,10 +208,13 @@ function depositView(){
         <div style="display:grid;gap:.4rem">${st.t.unpaid.map(c=>`<div style="display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;background:rgba(255,255,255,.08);border-radius:8px;padding:.45rem .6rem">
           <span><b>Room ${esc(c.room)}</b> · ${fmtTime(c.came_at)} · ${c.nights} night${c.nights>1?"s":""} · ${K(charged(c))}</span>
           ${["reception","manager","admin"].includes(A.me.role)?`<span class="seg" role="group" aria-label="Payment for room ${esc(c.room)}" style="margin-left:auto"><button data-act="pay" data-id="${c.id}" data-v="cash" style="color:var(--ink,#183820)">Cash</button><button data-act="pay" data-id="${c.id}" data-v="mobile" style="color:var(--ink,#183820)">Mobile</button></span>`:""}</div>`).join("")}</div>`:""}
-      <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+      ${site(bid).lipila_mode==="demo" ? `<div style="display:flex;gap:.5rem;flex-wrap:wrap">
+        <button class="btn primary" data-act="lipilaDemo" data-k="${k}" ${st.t.unpaid.length?"disabled":""}>Pay ${K(st.t.total)} via Lipila</button></div>
+        <p class="small" style="opacity:.8">A payment request goes to the reception phone. Approve it with the PIN. <b>Demo mode: no real money moves.</b></p></div>` :
+      `<div style="display:flex;gap:.5rem;flex-wrap:wrap">
       ${!prepared?`<button class="btn" data-act="closeDay" data-k="${k}" ${st.t.unpaid.length?"disabled":""}>Close ${fmtDay(k)}</button>`:
         `<button class="btn" data-act="testDeposit" data-k="${k}">Record deposit reference</button>`}</div>
-      <p class="small" style="opacity:.8">Lipila is not connected yet. Pay ${K(st.t.total)} to the company number as usual, then record the mobile money reference here (test mode).</p></div>`;
+      <p class="small" style="opacity:.8">Lipila is not connected yet. Pay ${K(st.t.total)} to the company number as usual, then record the mobile money reference here (test mode).</p></div>`}`;
   };
   return `<div class="head"><div><h1>Deposit</h1><p class="meta">Each day's total goes to the company's Lipila account by 10:00 the next morning.</p></div></div>
   <div class="grid2">${days.length?days.map(card).join(""):`<div class="deposit done"><h2>Nothing due</h2><p>All past days are deposited.</p></div>`}
@@ -374,7 +377,14 @@ function adminView(){
   if (A.adminTab==="sync") body = `<section class="panel"><h2>DS668 sync</h2><div class="tbl-wrap"><table><thead><tr><th>Branch</th><th>Status</th><th>Latest DS668 guest</th></tr></thead><tbody>
     ${A.branches.map(b=>{ const s=A.D.sync.find(x=>x.branch_id===b.id); return `<tr><td><b>${esc(b.name)}</b></td><td class="small">${syncLine(b.id)}</td><td class="num">${s?("#"+s.last_ds_guest_id):"–"}</td></tr>`; }).join("")}
     </tbody></table></div><p class="small muted">The laptop helper is installed at Mumbwa. It is waiting for database access from the DS668 supplier. Until then, reception adds check-ins by hand.</p></section>`;
-  if (A.adminTab==="lipila") body = `<section class="panel"><h2>Lipila</h2><p class="stripe warn">Not connected yet. Deposits are recorded in test mode with the mobile money reference. Live Lipila requests start once the lodge's Lipila business keys are added.</p></section>`;
+  if (A.adminTab==="lipila") body = `<section class="panel"><h2>Lipila</h2>
+    <p class="stripe warn">Live Lipila needs the lodge's Lipila business keys. Until then, each branch can use <b>Demo</b> to show the full payment flow (no real money moves) or <b>Off</b> to record mobile money references by hand.</p>
+    <div class="tbl-wrap"><table><thead><tr><th>Branch</th><th>Lipila mode</th></tr></thead><tbody>
+    ${A.branches.map(b=>`<tr><td><b>${esc(b.name)}</b></td><td><select data-act="lipilaMode" data-id="${b.id}" style="max-width:240px">
+      <option value="off" ${b.lipila_mode==="off"?"selected":""}>Off: record references by hand</option>
+      <option value="demo" ${b.lipila_mode==="demo"?"selected":""}>Demo: show the Lipila flow</option>
+      <option value="live" disabled>Live (needs Lipila keys)</option></select></td></tr>`).join("")}
+    </tbody></table></div></section>`;
   if (A.adminTab==="guide") body = guideEditor();
   return `<div class="head"><div><h1>Settings</h1><p class="meta">Staff, branches, sync, payments and the staff guide</p></div>
   <div class="seg" role="group" aria-label="Settings section">${tabs.map(([k,l])=>`<button data-act="adminTab" data-v="${k}" aria-pressed="${A.adminTab===k}">${l}</button>`).join("")}</div></div>${body}`;
@@ -400,6 +410,19 @@ function modalView(){
     <p>Amount: <b>${K(st.t.total)}</b></p><p class="small muted">Test mode while Lipila is being connected. Enter the reference from the mobile money message after paying the company number.</p>
     <label class="f">Mobile money reference<input id="d-ref" type="text" required></label>
     <div class="actions"><button type="button" class="btn" data-act="close">Cancel</button><button class="btn primary" type="submit">Save deposit</button></div>`, "depositForm"); }
+  if (m.type==="lipila"){
+    const phone = site(A.branch).reception_number || "the reception phone";
+    const steps = [["Sending payment request", `To ${esc(phone)} for ${K(m.amount)}`],["Waiting for approval","The receptionist enters the mobile money PIN on the reception phone"],["Payment received",m.ref?`Lipila reference <b class="num">${esc(m.ref)}</b>`:"Confirming with Lipila"]];
+    return `<div class="scrim"><div class="modal" role="dialog" aria-label="Lipila payment">
+      <div class="panel-h"><h2>Lipila deposit · ${fmtDay(m.k)}</h2><span class="pill warn">Demo</span></div>
+      <div style="font-size:2rem;font-weight:800" class="num">${K(m.amount)}</div>
+      <ol style="list-style:none;padding:0;margin:0;display:grid;gap:.7rem">${steps.map(([t,d],i)=>{ const n=i+1, done=m.step>n||(m.step===3&&m.ref), cur=m.step===n&&!done;
+        return `<li style="display:flex;gap:.7rem;align-items:flex-start;opacity:${m.step>=n?1:.4}"><span style="flex:none;width:1.6rem;height:1.6rem;border-radius:50%;display:grid;place-items:center;font-weight:800;color:#fff;background:${done?"var(--green)":cur?"var(--gold-line,#C5B361)":"#9aa"}">${done?"✓":cur?'<span class="spin"></span>':n}</span>
+          <div><b>${t}</b><div class="small muted">${d}</div></div></li>`; }).join("")}</ol>
+      ${m.err?`<p class="err">${esc(m.err)}</p>`:""}
+      ${m.ref?`<p class="small muted">${fmtDay(m.k)} is now deposited and locked. Demo mode: no real money moved.</p><div class="actions"><button class="btn primary" data-act="close">Done</button></div>`:m.err?`<div class="actions"><button class="btn" data-act="close">Close</button></div>`:""}
+    </div></div>`;
+  }
   if (m.type==="resetPw"){ const p = A.D.profiles.find(x=>x.id===m.id); return wrap(`<h2>Reset password · ${esc(p.full_name)}</h2>
     <label class="f">New temporary password (at least 8 characters)<input id="r-pw" type="text" minlength="8" autocomplete="off" required></label>
     <p class="small muted">They will be asked to choose their own password when they next sign in.</p>
@@ -443,6 +466,16 @@ document.addEventListener("click", async e=>{
     if (a==="waiver"){ A.modal={type:"waiver", id}; render(); }
     if (a==="testDeposit"){ A.modal={type:"testDeposit", k:b.dataset.k}; render(); }
     if (a==="resetPw"){ A.modal={type:"resetPw", id}; render(); }
+    if (a==="lipilaDemo"){ const k=b.dataset.k, amount=depositState(A.branch,k).t.total;
+      const m = A.modal = {type:"lipila", k, amount, step:1}; render();
+      try {
+        const p = await sb.rpc("prepare_deposit",{p_branch:A.branch, p_date:k}); if (p.error) throw p.error;
+        await new Promise(r=>setTimeout(r,1800)); m.step=2; render();
+        await new Promise(r=>setTimeout(r,3200)); m.step=3; render();
+        const ref = "LPL-DEMO-" + Math.random().toString(36).slice(2,8).toUpperCase();
+        const d = await sb.rpc("record_test_deposit",{p_branch:A.branch, p_date:k, p_reference:ref}); if (d.error) throw d.error;
+        await new Promise(r=>setTimeout(r,900)); m.ref = ref; await loadData(); render();
+      } catch(err){ m.err = err.message||String(err); render(); } }
     if (a==="pay"){ const { error } = await sb.rpc("record_payment",{p_checkin:id, p_method:b.dataset.v}); if (error) throw error; await refresh(); }
     if (a==="wdecide"){ const { error } = await sb.rpc("decide_waiver",{p_waiver:id, p_decision:b.dataset.v}); if (error) throw error; await refresh(); toast(b.dataset.v==="confirmed"?"Waiver confirmed":"Waiver disputed. The manager and owner can see it."); }
     if (a==="closeDay"){ const { error } = await sb.rpc("prepare_deposit",{p_branch:A.branch, p_date:b.dataset.k}); if (error) throw error; await refresh(); toast(fmtDay(b.dataset.k)+" closed. Record the deposit reference after paying."); }
@@ -453,6 +486,7 @@ document.addEventListener("change", async e=>{
   const t = e.target; if (!t.dataset || !t.dataset.act) return;
   try {
     if (t.dataset.act==="rate"){ const v = Math.max(0, Number(t.value)||0); const { error } = await sb.from("branches").update({rate:v}).eq("id", t.dataset.id); if (error) throw error; await refresh(); toast(site(t.dataset.id).name+" rate set to "+K(v)); }
+    if (t.dataset.act==="lipilaMode"){ const { error } = await sb.from("branches").update({lipila_mode:t.value}).eq("id", t.dataset.id); if (error) throw error; await refresh(); toast(site(t.dataset.id).name+": Lipila "+(t.value==="demo"?"demo mode on":"off")); }
     if (t.dataset.act==="gTab"){ A.guide.tab=t.value; A.guide.loaded=false; render(); await refreshGuide(); }
     if (t.dataset.act==="sim"){ const { error } = await sb.from("branches").update({reception_number:t.value.trim()||null}).eq("id", t.dataset.id); if (error) throw error; await refresh(); toast("Reception number saved"); }
   } catch(err){ fail(err); }
