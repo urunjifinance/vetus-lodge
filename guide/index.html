@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Vetus Lodge Staff Guide</title><meta name="author" content="Kalaluka Sydney Nawa"><link rel="icon" href="../logo.jpg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700;800&family=Source+Sans+3:wght@400;500;600;700&display=swap">
+<style>*{box-sizing:border-box} body{margin:0} img{max-width:100%} 
+/* Layout: forest-green hero with logo, sticky role switcher, then one column of step cards per role (max 860px) */
+:root{
+  --bg:#F2F5F0; --surface:#FFFFFF; --surface-2:#F6F8F4; --ink:#14251A; --muted:#5B6A5E; --line:#DCE4D9;
+  --brand:#183820; --brand-2:#22492B; --on-brand:#FFFFFF;
+  --red:#C92B28; --green:#2B8F1C; --gold:#C5B361; --gold-ink:#7A6420;
+  --ok-bg:#E3F3DE; --warn-bg:#FBF1D6; --bad-bg:#F9E2E1;
+  --f-display:"Montserrat","Segoe UI",Arial,sans-serif;
+  --f-body:"Source Sans 3","Segoe UI",Arial,sans-serif;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#0D1A11; --surface:#142619; --surface-2:#18301F; --ink:#E6EEE4; --muted:#9BAC9E; --line:#28432F;
+  --brand:#0A160D; --brand-2:#183820; --red:#EA5D59; --green:#52C93C; --gold:#D3C07A; --gold-ink:#E2CF86;
+  --ok-bg:#1C391B; --warn-bg:#3A3016; --bad-bg:#45201F; color-scheme:dark }}
+:root[data-theme="dark"]{
+  --bg:#0D1A11; --surface:#142619; --surface-2:#18301F; --ink:#E6EEE4; --muted:#9BAC9E; --line:#28432F;
+  --brand:#0A160D; --brand-2:#183820; --red:#EA5D59; --green:#52C93C; --gold:#D3C07A; --gold-ink:#E2CF86;
+  --ok-bg:#1C391B; --warn-bg:#3A3016; --bad-bg:#45201F; color-scheme:dark }
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:16px;line-height:1.55}
+h1,h2,h3{font-family:var(--f-display);margin:0;text-wrap:balance;letter-spacing:-.01em}
+p{margin:0}
+.wrap{max-width:860px;margin:0 auto;padding-inline:16px}
+
+/* Hero */
+.hero{background:var(--brand);color:var(--on-brand);border-bottom:4px solid var(--gold);padding-block:2rem 1.6rem}
+.hero .wrap{display:grid;grid-template-columns:auto 1fr;gap:1.2rem;align-items:center}
+.hero img{width:92px;height:92px;border-radius:50%;object-fit:cover;object-position:center 32%;border:3px solid var(--gold)}
+.eyebrow{font-size:.75rem;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--gold)}
+.hero h1{font-size:clamp(1.6rem,4vw,2.3rem);font-weight:800;line-height:1.1;margin-top:.2rem}
+.hero p{opacity:.85;margin-top:.4rem;max-width:52ch}
+.url{display:inline-block;margin-top:.7rem;font-weight:700;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.25);padding:.25rem .7rem;border-radius:99px;font-size:.92rem}
+@media (max-width:520px){ .hero .wrap{grid-template-columns:1fr} .hero img{width:72px;height:72px} }
+
+/* Role switcher */
+.roles{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);border-bottom:1px solid var(--line)}
+.roles .wrap{display:flex;gap:.4rem;overflow-x:auto;padding-block:.7rem}
+.roles button{font:inherit;font-weight:700;border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:.45rem .95rem;border-radius:99px;cursor:pointer;white-space:nowrap}
+.roles button[aria-selected="true"]{background:var(--brand-2);color:#fff;border-color:var(--brand-2)}
+.roles button:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+
+main{display:grid;gap:1.6rem;padding-block:1.6rem 3rem}
+section[role="tabpanel"]{display:grid;gap:1.1rem}
+[hidden]{display:none!important}
+.intro{display:grid;gap:.4rem}
+.intro h2{font-size:1.5rem;font-weight:800}
+.intro p{color:var(--muted)}
+
+/* Step cards */
+.steps{display:grid;gap:.8rem;counter-reset:s;list-style:none;margin:0;padding:0}
+.step{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:1rem 1.1rem;display:grid;grid-template-columns:2.4rem 1fr;gap:.9rem;align-items:start}
+.step::before{counter-increment:s;content:counter(s);width:2.4rem;height:2.4rem;border-radius:50%;background:var(--brand-2);color:#fff;display:grid;place-items:center;font-family:var(--f-display);font-weight:800}
+.step h3{font-size:1.05rem;font-weight:700;margin-bottom:.25rem}
+.step p,.step li{color:var(--ink)}
+.step .how{color:var(--muted);font-size:.95rem}
+.step ul{margin:.35rem 0 0;padding-left:1.1rem;display:grid;gap:.2rem}
+.tap{display:inline-block;font-weight:700;font-size:.86rem;padding:.05rem .5rem;border-radius:6px;background:var(--surface-2);border:1px solid var(--line);white-space:nowrap}
+.tap.go{background:var(--green);color:#fff;border-color:var(--green)}
+
+/* Callouts */
+.note{border-radius:12px;padding:.85rem 1rem;display:grid;gap:.2rem;border:1px solid var(--line)}
+.note b{font-family:var(--f-display);font-size:.8rem;letter-spacing:.08em;text-transform:uppercase}
+.note.gold{background:var(--warn-bg);border-color:var(--gold)} .note.gold b{color:var(--gold-ink)}
+.note.red{background:var(--bad-bg);border-color:var(--red)} .note.red b{color:var(--red)}
+.note.green{background:var(--ok-bg);border-color:var(--green)} .note.green b{color:var(--green)}
+
+/* Day timeline */
+.day{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:1rem 1.1rem}
+.day h3{font-size:1rem;margin-bottom:.6rem}
+.tl{display:grid;gap:0;margin:0;padding:0;list-style:none}
+.tl li{display:grid;grid-template-columns:4.6rem 1fr;gap:.8rem;padding:.45rem 0;border-top:1px dashed var(--line)}
+.tl li:first-child{border-top:0}
+.tl time{font-family:var(--f-display);font-weight:800;font-variant-numeric:tabular-nums;color:var(--green)}
+.tl li.key time{color:var(--red)}
+
+/* Rules + FAQ */
+.rules{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:.8rem}
+.rule{background:var(--surface);border:1px solid var(--line);border-top:4px solid var(--gold);border-radius:12px;padding:.9rem 1rem}
+.rule h3{font-size:.95rem;margin-bottom:.2rem}
+.rule p{color:var(--muted);font-size:.95rem}
+details{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:.8rem 1rem}
+details+details{margin-top:.6rem}
+summary{font-weight:700;cursor:pointer}
+details p{color:var(--muted);margin-top:.4rem}
+.status{display:inline-block;font-size:.78rem;font-weight:700;padding:.08rem .5rem;border-radius:99px}
+.status.ok{background:var(--ok-bg);color:var(--green)} .status.warn{background:var(--warn-bg);color:var(--gold-ink)} .status.bad{background:var(--bad-bg);color:var(--red)}
+footer{color:var(--muted);font-size:.85rem;border-top:1px solid var(--line);padding-top:1rem}
+@media (prefers-reduced-motion:no-preference){ section[role="tabpanel"]{animation:in .25s ease-out} @keyframes in{from{opacity:.4;transform:translateY(4px)}to{opacity:1;transform:none}} }
+ 
+.url{color:#fff;text-decoration:none}
+h3.sub{font-size:1.1rem;margin-top:.4rem}
+.faqs{display:grid;gap:.6rem}
+details+details{margin-top:0}
+.muted{color:var(--muted)}
+footer{color:var(--muted);font-size:.85rem;border-top:1px solid var(--line);padding-top:1rem}
+</style></head>
+<body>
+<header class="hero"><div class="wrap">
+  <img src="../logo.jpg" alt="Vetus Lodge logo">
+  <div>
+    <div class="eyebrow">Staff guide</div>
+    <h1>Vetus Lodge Daily Sales</h1>
+    <p>Check guests in on the lock system. The app tracks every stay, payment and waiver, and the day's money reaches the company's Lipila account by 10:00 the next morning.</p>
+    <a class="url" href="/">Open the app →</a>
+  </div>
+</div></header>
+
+<nav class="roles" aria-label="Choose your role"><div class="wrap" role="tablist">
+  <button role="tab" id="t-start" aria-controls="p-start" aria-selected="true">Getting started</button>
+  <button role="tab" id="t-rec" aria-controls="p-rec" aria-selected="false">Reception</button>
+  <button role="tab" id="t-mgr" aria-controls="p-mgr" aria-selected="false">Manager</button>
+  <button role="tab" id="t-dir" aria-controls="p-dir" aria-selected="false">Directors</button>
+  <button role="tab" id="t-adm" aria-controls="p-adm" aria-selected="false">System admin</button>
+  <button role="tab" id="t-help" aria-controls="p-help" aria-selected="false">Rules & help</button>
+</div></nav>
+
+<main class="wrap"><section role="tabpanel" id="p-start" aria-labelledby="t-start"><p class="muted">Loading…</p></section><section role="tabpanel" id="p-rec" aria-labelledby="t-rec" hidden><p class="muted">Loading…</p></section><section role="tabpanel" id="p-mgr" aria-labelledby="t-mgr" hidden><p class="muted">Loading…</p></section><section role="tabpanel" id="p-dir" aria-labelledby="t-dir" hidden><p class="muted">Loading…</p></section><section role="tabpanel" id="p-adm" aria-labelledby="t-adm" hidden><p class="muted">Loading…</p></section><section role="tabpanel" id="p-help" aria-labelledby="t-help" hidden><p class="muted">Loading…</p></section>
+<footer>Vetus Lodge · Mumbwa · Kaoma · Kasempa. System by Urunji Innovations. Support: Kalaluka Sydney Nawa.</footer></main>
+<script src="../supabase.js"></script>
+<script src="../guide-render.js"></script>
+<script>
+(async function(){
+  const sb = supabase.createClient("https://csmtjttaeibqesgymxfs.supabase.co","sb_publishable_t1AeDZDr6_czlrU4NxWZNw_ri712Jnr");
+  const { data, error } = await sb.from("guide_blocks").select("tab,position,kind,title,body").order("tab").order("position");
+  for (const k of ["start","rec","mgr","dir","adm","help"]){
+    const el = document.getElementById("p-"+k);
+    if (error){ el.innerHTML = '<p class="muted">The guide could not load. Check your internet connection and refresh.</p>'; continue; }
+    const rows = data.filter(b=>b.tab===k);
+    el.innerHTML = rows.length ? GuideRender.render(rows) : '<p class="muted">This section is empty.</p>';
+  }
+})();
+</script>
+<script>
+const tabs=[...document.querySelectorAll('[role="tab"]')];
+function show(t, focus){
+  tabs.forEach(b=>{const on=b===t; b.setAttribute('aria-selected',on); b.tabIndex=on?0:-1; document.getElementById(b.getAttribute('aria-controls')).hidden=!on;});
+  if(focus) t.focus();
+  try{ history.replaceState(null,'','#'+t.id.slice(2)); }catch(e){}
+  window.scrollTo({top:0,behavior:'instant'});
+}
+tabs.forEach((b,i)=>{ b.addEventListener('click',()=>show(b)); b.addEventListener('keydown',e=>{ if(e.key==='ArrowRight') show(tabs[(i+1)%tabs.length],true); if(e.key==='ArrowLeft') show(tabs[(i-1+tabs.length)%tabs.length],true); }); });
+const h=(location.hash||'').slice(1); const pre=tabs.find(b=>b.id==='t-'+h); if(pre) show(pre);
+</script>
+</body></html>

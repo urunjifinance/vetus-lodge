@@ -14,7 +14,7 @@ const fmtTime = d => new Date(d).toLocaleTimeString("en-GB",{hour:"2-digit",minu
 const ROLES = {reception:"Reception", manager:"Manager", director:"Director", admin:"System admin"};
 const pct = v => v==null || !isFinite(v) ? "–" : Math.round(v*100)+"%";
 
-const A = {me:null, branches:[], branch:null, tab:null, period:"week", modal:null, toast:null, err:"", busy:false, adminTab:"users",
+const A = {me:null, branches:[], branch:null, tab:null, period:"week", modal:null, toast:null, err:"", busy:false, adminTab:"users", guide:{tab:"start", rows:[], loaded:false},
   D:{checkins:[], waivers:[], deposits:[], sync:[], directors:[], profiles:[]}, loaded:false};
 
 const $app = document.getElementById("app");
@@ -107,6 +107,7 @@ function topBar(){
     <div class="who small"><span>Role: <b>${A.me?ROLES[A.me.role]:"None"}</b></span><span>Branch: <b>${esc(br)}</b></span>
     ${A.me?`<span>${esc(A.me.full_name)}</span>`:""}
     ${A.me&&A.branch&&multi?`<button class="btn small" data-act="switchBranch">Switch branch</button>`:""}
+    <a class="btn small" href="/guide/" target="_blank" rel="noopener">Help</a>
     ${A.me?`<button class="btn small" data-act="logout">Log out</button>`:""}</div></div>`;
 }
 function loginView(){
@@ -311,9 +312,44 @@ function overviewView(){
   <section class="panel"><h2>Daily sales · last 7 days</h2>${chart(ids)}</section></div>`;
 }
 
+/* Guide editor */
+const GTABS = [["start","Getting started"],["rec","Reception"],["mgr","Manager"],["dir","Directors"],["adm","System admin"],["help","Rules & help"]];
+const GKINDS = {intro:"Section intro", step:"Numbered step", heading:"Sub-heading", text:"Paragraph", "note-gold":"Note (gold)", "note-green":"Tip (green)", "note-red":"Warning (red)", timeline:"Day timeline", rule:"Rule card", faq:"Question & answer"};
+async function loadGuide(){
+  const { data, error } = await sb.from("guide_blocks").select("*").eq("tab", A.guide.tab).order("position");
+  if (error) throw error; A.guide.rows = data; A.guide.loaded = true;
+}
+async function refreshGuide(){ try { await loadGuide(); } catch(e){ fail(e); } render(); }
+function guideEditor(){
+  const g = A.guide;
+  const rows = g.rows.map((r,i)=>`<div class="gb"><div class="k">${esc(GKINDS[r.kind]||r.kind)}</div>
+    <div><div class="t">${esc(r.title)||'<span class="muted">(no title)</span>'}</div>${r.body?`<div class="p">${esc(r.body)}</div>`:""}</div>
+    <div class="acts"><button class="btn small" data-act="gMove" data-id="${r.id}" data-v="-1" ${i?"":"disabled"} aria-label="Move up">↑</button>
+    <button class="btn small" data-act="gMove" data-id="${r.id}" data-v="1" ${i<g.rows.length-1?"":"disabled"} aria-label="Move down">↓</button>
+    <button class="btn small" data-act="gEdit" data-id="${r.id}">Edit</button>
+    <button class="btn small" data-act="gAdd" data-after="${r.id}">+ Below</button>
+    <button class="btn small" data-act="gDel" data-id="${r.id}">Remove</button></div></div>`).join("");
+  return `<section class="panel"><div class="panel-h"><h2>Staff guide</h2><a class="btn small" href="/guide/#${g.tab}" target="_blank" rel="noopener">View guide ↗</a></div>
+    <p class="small muted">Edit what staff see at <b>www.vetuslodge.vip/guide</b>. Changes go live as soon as you save.</p>
+    <label class="f" style="max-width:260px">Guide page<select id="g-tab" data-act="gTab">${GTABS.map(([k,l])=>`<option value="${k}" ${k===g.tab?"selected":""}>${l}</option>`).join("")}</select></label>
+    ${!g.loaded?'<p class="muted"><span class="spin"></span> Loading…</p>':rows||'<p class="muted">This page is empty.</p>'}
+    <div style="margin-top:.8rem"><button class="btn primary" data-act="gAdd">Add a section at the end</button></div></section>`;
+}
+function guideModal(m){
+  const r = m.id ? A.guide.rows.find(x=>x.id===m.id) : {kind:"step", title:"", body:""};
+  return `<h2>${m.id?"Edit section":"New section"} · ${esc(GTABS.find(t=>t[0]===A.guide.tab)[1])}</h2>
+    <label class="f">Type<select id="g-kind">${Object.entries(GKINDS).map(([k,v])=>`<option value="${k}" ${k===r.kind?"selected":""}>${v}</option>`).join("")}</select></label>
+    <label class="f">Title<input id="g-title" type="text" value="${esc(r.title)}"></label>
+    <label class="f">Text<textarea id="g-body">${esc(r.body)}</textarea></label>
+    <details class="small"><summary>Formatting help</summary>
+      <p><b>**bold**</b> · <b>[[Button]]</b> grey button · <b>[[+Button]]</b> green button · <b>{{ok:Deposited}}</b> <b>{{warn:Due}}</b> <b>{{bad:Overdue}}</b> coloured labels</p>
+      <p>Start a line with <b>- </b> for a bullet, or <b>&gt; </b> for a "how to" tip.</p>
+      <p>Day timeline: one line per time, <b>10:00 | What happens</b>. Start a line with <b>!</b> to highlight it.</p></details>`;
+}
+
 /* Admin */
 function adminView(){
-  const tabs=[["users","Users"],["branches","Branches & rates"],["sync","DS668 sync"],["lipila","Lipila"]];
+  const tabs=[["users","Users"],["branches","Branches & rates"],["sync","DS668 sync"],["lipila","Lipila"],["guide","Guide"]];
   let body="";
   if (A.adminTab==="users") body = `<section class="panel"><h2>Staff accounts</h2><div class="tbl-wrap"><table><thead><tr><th>Name</th><th>Username</th><th>Role</th><th>Branch</th><th>Status</th><th></th></tr></thead><tbody>
     ${A.D.profiles.map(p=>`<tr><td><b>${esc(p.full_name)}</b></td><td class="num">${esc(p.username)}</td><td>${ROLES[p.role]}</td><td>${p.branch_id?esc(site(p.branch_id).name):"All branches"}</td>
@@ -336,7 +372,8 @@ function adminView(){
     ${A.branches.map(b=>{ const s=A.D.sync.find(x=>x.branch_id===b.id); return `<tr><td><b>${esc(b.name)}</b></td><td class="small">${syncLine(b.id)}</td><td class="num">${s?("#"+s.last_ds_guest_id):"–"}</td></tr>`; }).join("")}
     </tbody></table></div><p class="small muted">The laptop helper is installed at Mumbwa. It is waiting for database access from the DS668 supplier. Until then, reception adds check-ins by hand.</p></section>`;
   if (A.adminTab==="lipila") body = `<section class="panel"><h2>Lipila</h2><p class="stripe warn">Not connected yet. Deposits are recorded in test mode with the mobile money reference. Live Lipila requests start once the lodge's Lipila business keys are added.</p></section>`;
-  return `<div class="head"><div><h1>Settings</h1><p class="meta">Staff, branches, sync and payments</p></div>
+  if (A.adminTab==="guide") body = guideEditor();
+  return `<div class="head"><div><h1>Settings</h1><p class="meta">Staff, branches, sync, payments and the staff guide</p></div>
   <div class="seg" role="group" aria-label="Settings section">${tabs.map(([k,l])=>`<button data-act="adminTab" data-v="${k}" aria-pressed="${A.adminTab===k}">${l}</button>`).join("")}</div></div>${body}`;
 }
 
@@ -364,6 +401,11 @@ function modalView(){
     <label class="f">New temporary password (at least 8 characters)<input id="r-pw" type="text" minlength="8" autocomplete="off" required></label>
     <p class="small muted">They will be asked to choose their own password when they next sign in.</p>
     <div class="actions"><button type="button" class="btn" data-act="close">Cancel</button><button class="btn primary" type="submit">Reset password</button></div>`, "resetForm"); }
+  if (m.type==="guide") return `<div class="scrim"><form class="modal wide" id="guideForm">${guideModal(m)}${m.err?`<p class="err">${esc(m.err)}</p>`:""}
+    <div class="actions"><button type="button" class="btn" data-act="close">Cancel</button><button class="btn primary" type="submit">Save</button></div></form></div>`;
+  if (m.type==="guideDel"){ const r = A.guide.rows.find(x=>x.id===m.id); return wrap(`<h2>Remove this section?</h2>
+    <p><b>${esc(r.title||GKINDS[r.kind])}</b> will be removed from the guide straight away.</p>
+    <div class="actions"><button type="button" class="btn" data-act="close">Cancel</button><button class="btn primary" type="submit" style="background:var(--red);border-color:var(--red)">Remove</button></div>`, "guideDelForm"); }
   return "";
 }
 
@@ -383,7 +425,15 @@ document.addEventListener("click", async e=>{
     if (a==="pickBranch"){ A.branch=id; A.tab=tabsFor()[0][0]; A.loaded=false; render(); await refresh(); }
     if (a==="tab"){ A.tab=b.dataset.tab; render(); }
     if (a==="period"){ A.period=b.dataset.v; render(); }
-    if (a==="adminTab"){ A.adminTab=b.dataset.v; render(); }
+    if (a==="adminTab"){ A.adminTab=b.dataset.v; render(); if (A.adminTab==="guide" && !A.guide.loaded) await refreshGuide(); }
+    if (a==="gEdit"){ A.modal={type:"guide", id}; render(); }
+    if (a==="gAdd"){ A.modal={type:"guide", after:b.dataset.after||null}; render(); }
+    if (a==="gDel"){ A.modal={type:"guideDel", id}; render(); }
+    if (a==="gMove"){ const rows=A.guide.rows, i=rows.findIndex(r=>r.id===id), j=i+Number(b.dataset.v); if (j<0||j>=rows.length) return;
+      const x=rows[i], y=rows[j];
+      const r1 = await sb.from("guide_blocks").update({position:y.position, updated_at:new Date().toISOString(), updated_by:A.me.id}).eq("id",x.id); if (r1.error) throw r1.error;
+      const r2 = await sb.from("guide_blocks").update({position:x.position, updated_at:new Date().toISOString(), updated_by:A.me.id}).eq("id",y.id); if (r2.error) throw r2.error;
+      await refreshGuide(); }
     if (a==="refresh"){ await refresh(); toast("Updated"); }
     if (a==="close"){ A.modal=null; render(); }
     if (a==="manual"){ A.modal={type:"manual"}; render(); }
@@ -400,6 +450,7 @@ document.addEventListener("change", async e=>{
   const t = e.target; if (!t.dataset || !t.dataset.act) return;
   try {
     if (t.dataset.act==="rate"){ const v = Math.max(0, Number(t.value)||0); const { error } = await sb.from("branches").update({rate:v}).eq("id", t.dataset.id); if (error) throw error; await refresh(); toast(site(t.dataset.id).name+" rate set to "+K(v)); }
+    if (t.dataset.act==="gTab"){ A.guide.tab=t.value; A.guide.loaded=false; render(); await refreshGuide(); }
     if (t.dataset.act==="sim"){ const { error } = await sb.from("branches").update({reception_number:t.value.trim()||null}).eq("id", t.dataset.id); if (error) throw error; await refresh(); toast("Reception number saved"); }
   } catch(err){ fail(err); }
 });
@@ -441,6 +492,27 @@ document.addEventListener("submit", async e=>{
     if (f==="resetForm"){
       try { await adminCall({action:"reset", id:A.modal.id, password:document.getElementById("r-pw").value}); } catch(err){ return setErr(err.message); }
       A.modal=null; await refresh(); toast("Password reset. Give them the temporary password in person.");
+    }
+    if (f==="guideForm"){
+      const rec = {kind:document.getElementById("g-kind").value, title:document.getElementById("g-title").value.trim(), body:document.getElementById("g-body").value.replace(/\r/g,"").trim(), updated_at:new Date().toISOString(), updated_by:A.me.id};
+      if (!rec.title && !rec.body) return setErr("Add a title or some text.");
+      let r;
+      if (A.modal.id) r = await sb.from("guide_blocks").update(rec).eq("id", A.modal.id);
+      else {
+        const rows = A.guide.rows; let pos;
+        if (A.modal.after){ const i = rows.findIndex(x=>x.id===A.modal.after);
+          if (i === rows.length-1) pos = rows[i].position + 10;
+          else if (rows[i+1].position - rows[i].position > 1) pos = Math.floor((rows[i].position + rows[i+1].position)/2);
+          else { for (let k=0;k<rows.length;k++){ const u = await sb.from("guide_blocks").update({position:(k+1)*10 + (k>i?10:0)}).eq("id",rows[k].id); if (u.error) throw u.error; } pos = (i+2)*10; } }
+        else pos = (rows.length ? rows[rows.length-1].position : 0) + 10;
+        r = await sb.from("guide_blocks").insert({...rec, tab:A.guide.tab, position:pos});
+      }
+      if (r.error) return setErr(r.error.message);
+      A.modal=null; await refreshGuide(); toast("Guide updated. It's live now.");
+    }
+    if (f==="guideDelForm"){
+      const r = await sb.from("guide_blocks").delete().eq("id", A.modal.id); if (r.error) return setErr(r.error.message);
+      A.modal=null; await refreshGuide(); toast("Section removed");
     }
     if (f==="addUser"){
       const role = document.getElementById("nu-role").value;
