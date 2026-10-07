@@ -176,7 +176,7 @@ function todayView(){
   const all = A.D.checkins.filter(c=>c.branch_id===bid && dayKey(c.came_at)===today);
   return `<div class="head"><div><h1>Today at ${esc(s.name)}</h1><p class="meta">${fmtDay(today)} · ${syncLine(bid)}</p></div>
     <div style="display:flex;gap:.5rem;flex-wrap:wrap"><button class="btn" data-act="refresh">Refresh</button>${canPay?`<button class="btn primary" data-act="manual">Add check-in</button>`:""}</div></div>
-  ${Y.status==="due"||Y.status==="overdue"?`<div class="panel stripe ${Y.status==="overdue"?"bad":"warn"}"><div class="panel-h"><div><h2>Yesterday's deposit: ${K(Y.t.total)}</h2><p class="muted small">${fmtDay(y)} must be paid by 10:00 today.</p></div><button class="btn primary" data-act="tab" data-tab="deposit">Go to deposit</button></div></div>`:""}
+  ${Y.status==="due"||Y.status==="overdue"?`<div class="panel stripe ${Y.status==="overdue"?"bad":"warn"}"><div class="panel-h"><div><h2>Yesterday's deposit: ${K(Y.t.total)}</h2><p class="muted small">${fmtDay(y)} must be paid by 10:00 today.${Y.t.unpaid.length?` <b style="color:var(--red)">${Y.t.unpaid.length} check-in(s) from ${fmtDay(y)} have no payment recorded. Record them on the Deposit tab.</b>`:""}</p></div><button class="btn primary" data-act="tab" data-tab="deposit">Go to deposit</button></div></div>`:""}
   <div class="kpis">
     <div class="kpi"><div class="l">Check-ins</div><div class="v">${T.count}</div><div class="s">${pct(T.count/s.room_count)} of ${s.room_count} rooms</div></div>
     <div class="kpi"><div class="l">Due today</div><div class="v">${K(T.total)}</div><div class="s">${T.waived?K(T.waived)+" waived":"No waivers"}</div></div>
@@ -204,7 +204,10 @@ function depositView(){
     return `<div class="deposit"><div class="small" style="opacity:.85;text-transform:uppercase;letter-spacing:.08em;font-weight:700">${st.status==="overdue"?"Overdue":"Due by 10:00 "+fmtDay(addDaysKey(k,1))}</div>
       <h2 style="color:#fff">${fmtDay(k)}</h2><div class="amt">${K(st.t.total)}</div>
       <div class="small" style="opacity:.9">${st.t.count} check-ins · cash ${K(st.t.cash)} · mobile ${K(st.t.mobile)}${st.t.waived?" · "+K(st.t.waived)+" waived":""}</div>
-      ${st.t.unpaid.length?`<p class="small" style="color:#FFD6D4;font-weight:700">${st.t.unpaid.length} check-in(s) still have no payment recorded. Record them first.</p>`:""}
+      ${st.t.unpaid.length?`<p class="small" style="color:#FFD6D4;font-weight:700">${st.t.unpaid.length} check-in(s) still have no payment recorded. Record how each one paid:</p>
+        <div style="display:grid;gap:.4rem">${st.t.unpaid.map(c=>`<div style="display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;background:rgba(255,255,255,.08);border-radius:8px;padding:.45rem .6rem">
+          <span><b>Room ${esc(c.room)}</b> · ${fmtTime(c.came_at)} · ${c.nights} night${c.nights>1?"s":""} · ${K(charged(c))}</span>
+          ${["reception","manager","admin"].includes(A.me.role)?`<span class="seg" role="group" aria-label="Payment for room ${esc(c.room)}" style="margin-left:auto"><button data-act="pay" data-id="${c.id}" data-v="cash" style="color:var(--ink,#183820)">Cash</button><button data-act="pay" data-id="${c.id}" data-v="mobile" style="color:var(--ink,#183820)">Mobile</button></span>`:""}</div>`).join("")}</div>`:""}
       <div style="display:flex;gap:.5rem;flex-wrap:wrap">
       ${!prepared?`<button class="btn" data-act="closeDay" data-k="${k}" ${st.t.unpaid.length?"disabled":""}>Close ${fmtDay(k)}</button>`:
         `<button class="btn" data-act="testDeposit" data-k="${k}">Record deposit reference</button>`}</div>
