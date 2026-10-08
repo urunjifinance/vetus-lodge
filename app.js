@@ -40,6 +40,7 @@ async function loadMe(){
   const b = await sb.from("branches").select("*").order("name");
   A.branches = b.data || [];
 }
+const isDemo = id => (A.branches.find(b=>b.id===id)||{}).lipila_mode==="demo";
 const site = id => A.branches.find(b=>b.id===id) || {id, name:id, room_count:0, rate:0};
 const scopeIds = () => A.branch==="ALL" ? A.branches.map(b=>b.id) : [A.branch];
 async function loadData(){
@@ -156,7 +157,12 @@ function tabsFor(){
 }
 function shell(){
   return `<header class="bar">${topBar()}<nav class="nav" aria-label="Sections">${tabsFor().map(([k,l])=>`<button data-act="tab" data-tab="${k}" aria-current="${A.tab===k?"page":"false"}">${l}</button>`).join("")}</nav></header>
-  <main>${!A.loaded?'<p class="muted"><span class="spin"></span> Loading…</p>':view()}</main>`;
+  ${demoBanner()}<main>${!A.loaded?'<p class="muted"><span class="spin"></span> Loading…</p>':view()}</main>`;
+}
+function demoBanner(){
+  const ids = A.branch==="ALL" ? A.branches.filter(b=>b.lipila_mode==="demo").map(b=>b.name) : (isDemo(A.branch)?[site(A.branch).name]:[]);
+  if (!ids.length) return "";
+  return `<div role="status" style="background:var(--gold-line,#C5B361);color:#183820;font-weight:700;text-align:center;padding:.45rem 1rem;font-size:.9rem">DEMO MODE · ${esc(ids.join(", "))} · Today's sales can be deposited straight away and Lipila payments are simulated. No real money moves.</div>`;
 }
 function view(){
   const t = A.tab;
@@ -175,7 +181,7 @@ function todayView(){
   const canPay = ["reception","manager","admin"].includes(A.me.role);
   const all = A.D.checkins.filter(c=>c.branch_id===bid && dayKey(c.came_at)===today);
   return `<div class="head"><div><h1>Today at ${esc(s.name)}</h1><p class="meta">${fmtDay(today)} · ${syncLine(bid)}</p></div>
-    <div style="display:flex;gap:.5rem;flex-wrap:wrap"><button class="btn" data-act="refresh">Refresh</button>${canPay?`<button class="btn primary" data-act="manual">Add check-in</button>`:""}</div></div>
+    <div style="display:flex;gap:.5rem;flex-wrap:wrap"><button class="btn" data-act="refresh">Refresh</button>${canPay&&isDemo(bid)?`<button class="btn" data-act="demoSamples">Add 3 sample guests</button>`:""}${canPay?`<button class="btn primary" data-act="manual">Add check-in</button>`:""}</div></div>
   ${Y.status==="due"||Y.status==="overdue"?`<div class="panel stripe ${Y.status==="overdue"?"bad":"warn"}"><div class="panel-h"><div><h2>Yesterday's deposit: ${K(Y.t.total)}</h2><p class="muted small">${fmtDay(y)} must be paid by 10:00 today.${Y.t.unpaid.length?` <b style="color:var(--red)">${Y.t.unpaid.length} check-in(s) from ${fmtDay(y)} have no payment recorded. Record them on the Deposit tab.</b>`:""}</p></div><button class="btn primary" data-act="tab" data-tab="deposit">Go to deposit</button></div></div>`:""}
   <div class="kpis">
     <div class="kpi"><div class="l">Check-ins</div><div class="v">${T.count}</div><div class="s">${pct(T.count/s.room_count)} of ${s.room_count} rooms</div></div>
@@ -197,11 +203,12 @@ function todayView(){
 /* Deposit (one branch) */
 function depositView(){
   const bid = A.branch, today = dayKey(Date.now());
-  const days = last7().map(k=>({k, st:depositState(bid,k)})).filter(x=>x.st.status==="due"||x.st.status==="overdue").reverse();
+  const keys = isDemo(bid) ? [...last7(), today] : last7();
+  const days = keys.map(k=>({k, st:depositState(bid,k)})).filter(x=>(x.st.status==="due"||x.st.status==="overdue") && x.st.t.count).reverse();
   const T = dayTotals(bid, today);
   const card = ({k, st}) => {
     const prepared = st.row && st.row.status!=="deposited";
-    return `<div class="deposit"><div class="small" style="opacity:.85;text-transform:uppercase;letter-spacing:.08em;font-weight:700">${st.status==="overdue"?"Overdue":"Due by 10:00 "+fmtDay(addDaysKey(k,1))}</div>
+    return `<div class="deposit"><div class="small" style="opacity:.85;text-transform:uppercase;letter-spacing:.08em;font-weight:700">${k===today?"Demo: deposit today's sales now":st.status==="overdue"?"Overdue":"Due by 10:00 "+fmtDay(addDaysKey(k,1))}</div>
       <h2 style="color:#fff">${fmtDay(k)}</h2><div class="amt">${K(st.t.total)}</div>
       <div class="small" style="opacity:.9">${st.t.count} check-ins · cash ${K(st.t.cash)} · mobile ${K(st.t.mobile)}${st.t.waived?" · "+K(st.t.waived)+" waived":""}</div>
       ${st.t.unpaid.length?`<p class="small" style="color:#FFD6D4;font-weight:700">${st.t.unpaid.length} check-in(s) still have no payment recorded. Record how each one paid:</p>
@@ -223,13 +230,14 @@ function depositView(){
     <div class="sum-row"><span>Waivers approved by directors</span><span class="num">− ${K(T.waived)}</span></div>
     <div class="sum-row"><span class="muted">Cash recorded</span><span class="num muted">${K(T.cash)}</span></div>
     <div class="sum-row"><span class="muted">Mobile money recorded</span><span class="num muted">${K(T.mobile)}</span></div>
-    <div class="sum-row total"><span>To deposit tomorrow</span><span class="num">${K(T.total)}</span></div></div></section></div>`;
+    <div class="sum-row total"><span>${isDemo(bid)?"To deposit now (demo)":"To deposit tomorrow"}</span><span class="num">${K(T.total)}</span></div></div></section></div>`;
 }
 
 /* Deposits table */
 function depositsView(){
   const ids = scopeIds(), rows = [];
-  for (const k of last7().reverse()) for (const bid of ids){ const st = depositState(bid,k); rows.push({k,bid,st}); }
+  const tdy = dayKey(Date.now()), hk = A.D.deposits.some(d=>d.business_date===tdy) ? [tdy, ...last7().reverse()] : last7().reverse();
+  for (const k of hk) for (const bid of ids){ const st = depositState(bid,k); rows.push({k,bid,st}); }
   return `<div class="head"><div><h1>Deposits</h1><p class="meta">Last 7 days · due by 10:00 the next morning</p></div><button class="btn" data-act="refresh">Refresh</button></div>
   <section class="panel"><div class="tbl-wrap"><table><thead><tr><th>Day</th>${ids.length>1?"<th>Branch</th>":""}<th class="r">Check-ins</th><th class="r">Waived</th><th class="r">Total</th><th>Status</th><th>Reference</th></tr></thead><tbody>
   ${rows.map(({k,bid,st})=>`<tr><td>${fmtDay(k)}</td>${ids.length>1?`<td>${esc(site(bid).name)}</td>`:""}<td class="r num">${st.t.count}</td><td class="r num">${st.t.waived?K(st.t.waived):"–"}</td><td class="r num"><b>${K(st.t.total)}</b></td><td>${pill(st.status, st.late)}</td>
@@ -379,12 +387,14 @@ function adminView(){
     </tbody></table></div><p class="small muted">The laptop helper is installed at Mumbwa. It is waiting for database access from the DS668 supplier. Until then, reception adds check-ins by hand.</p></section>`;
   if (A.adminTab==="lipila") body = `<section class="panel"><h2>Lipila</h2>
     <p class="stripe warn">Live Lipila needs the lodge's Lipila business keys. Until then, each branch can use <b>Demo</b> to show the full payment flow (no real money moves) or <b>Off</b> to record mobile money references by hand.</p>
-    <div class="tbl-wrap"><table><thead><tr><th>Branch</th><th>Lipila mode</th></tr></thead><tbody>
+    <div class="tbl-wrap"><table><thead><tr><th>Branch</th><th>Lipila mode</th><th>Demo data</th></tr></thead><tbody>
     ${A.branches.map(b=>`<tr><td><b>${esc(b.name)}</b></td><td><select data-act="lipilaMode" data-id="${b.id}" style="max-width:240px">
       <option value="off" ${b.lipila_mode==="off"?"selected":""}>Off: record references by hand</option>
       <option value="demo" ${b.lipila_mode==="demo"?"selected":""}>Demo: show the Lipila flow</option>
-      <option value="live" disabled>Live (needs Lipila keys)</option></select></td></tr>`).join("")}
-    </tbody></table></div></section>`;
+      <option value="live" disabled>Live (needs Lipila keys)</option></select></td>
+      <td class="small">${(()=>{ const n=A.D.checkins.filter(c=>c.branch_id===b.id&&c.is_demo).length; return n?`${n} demo check-in(s) recorded`:'<span class="muted">No demo data</span>'; })()}</td></tr>`).join("")}
+    </tbody></table></div>
+    <p class="small muted">In <b>Demo</b> mode a branch can deposit today's sales straight away, and every check-in and deposit made is tagged as demo. Switch back to <b>Off</b> after the demo, then ask the developer to clear the demo records.</p></section>`;
   if (A.adminTab==="guide") body = guideEditor();
   return `<div class="head"><div><h1>Settings</h1><p class="meta">Staff, branches, sync, payments and the staff guide</p></div>
   <div class="seg" role="group" aria-label="Settings section">${tabs.map(([k,l])=>`<button data-act="adminTab" data-v="${k}" aria-pressed="${A.adminTab===k}">${l}</button>`).join("")}</div></div>${body}`;
@@ -476,6 +486,7 @@ document.addEventListener("click", async e=>{
         const d = await sb.rpc("record_test_deposit",{p_branch:A.branch, p_date:k, p_reference:ref}); if (d.error) throw d.error;
         await new Promise(r=>setTimeout(r,900)); m.ref = ref; await loadData(); render();
       } catch(err){ m.err = err.message||String(err); render(); } }
+    if (a==="demoSamples"){ const { data, error } = await sb.rpc("demo_add_samples",{p_branch:A.branch}); if (error) throw error; await refresh(); toast(data+" sample guests added. Record how each one paid."); }
     if (a==="pay"){ const { error } = await sb.rpc("record_payment",{p_checkin:id, p_method:b.dataset.v}); if (error) throw error; await refresh(); }
     if (a==="wdecide"){ const { error } = await sb.rpc("decide_waiver",{p_waiver:id, p_decision:b.dataset.v}); if (error) throw error; await refresh(); toast(b.dataset.v==="confirmed"?"Waiver confirmed":"Waiver disputed. The manager and owner can see it."); }
     if (a==="closeDay"){ const { error } = await sb.rpc("prepare_deposit",{p_branch:A.branch, p_date:b.dataset.k}); if (error) throw error; await refresh(); toast(fmtDay(b.dataset.k)+" closed. Record the deposit reference after paying."); }
