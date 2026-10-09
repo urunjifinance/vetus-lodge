@@ -105,6 +105,25 @@ function syncLine(bid){
 const arrivalsToday = bid => { const t = dayKey(Date.now()); return A.D.bookings.filter(k=>(bid==="ALL"||k.branch_id===bid) && k.status==="booked" && k.arrive<=t); };
 const BSTAT = {booked:'<span class="pill warn">Booked</span>', checked_in:'<span class="pill ok">Checked in</span>', cancelled:'<span class="pill neutral">Cancelled</span>', no_show:'<span class="pill bad">No-show</span>'};
 const telLink = n => `<a href="tel:${esc(n)}">${esc(n)}</a>`;
+const pendingReq = bid => A.D.bookings.filter(k=>(bid==="ALL"||k.branch_id===bid) && k.status==="booked" && !k.confirmed);
+const waNum = s => { let d = String(s||"").replace(/\D/g,""); if (!d) return ""; if (d.startsWith("0")) d = "260" + d.slice(1); else if (d.length === 9) d = "260" + d; return d; };
+const first = n => String(n||"").trim().split(/\s+/)[0];
+const nights = k => `${k.nights} night${k.nights>1?"s":""}`;
+function guestMsg(k, kind, reason){
+  const br = site(k.branch_id), momo = br.reception_number;
+  const stay = `Ref: ${k.ref}\nCheck-in: ${fmtDay(k.arrive)}\nCheck-out: ${fmtDay(k.depart)}, 10:00\nNights: ${k.nights} · Guests: ${k.guests}`;
+  if (kind==="decline") return { subject:`Vetus Lodge ${br.name}: booking ${k.ref}`, text:`Hello ${first(k.guest_name)}, thank you for choosing Vetus Lodge ${br.name}. Unfortunately we cannot confirm your booking ${k.ref} for ${fmtDay(k.arrive)} to ${fmtDay(k.depart)}.${reason?" "+reason:""}\nPlease try other dates at www.vetuslodge.vip/book or reply to this message.` };
+  if (kind==="paid") return { subject:`Vetus Lodge ${br.name}: payment received ${k.ref}`, text:`Hello ${first(k.guest_name)}, we have received your payment of ${K(k.pay_amount)} (ref ${k.paid_ref||""}). Thank you!\n${stay}\nNothing more to pay. Show your booking reference at reception. See you soon!` };
+  const pay = k.pay_option==="now"
+    ? (k.paid_at ? `Paid: ${K(k.pay_amount)}. Nothing more to pay.`
+       : `To keep your ${Number(k.discount_pct)}% discount, please pay ${K(k.pay_amount)} by mobile money${momo?` to ${momo} (Vetus Lodge ${br.name} reception)`:" (reply for the number)"}, with reference ${k.ref}, before you arrive. Otherwise pay ${K(k.amount)} at the lodge.`)
+    : `Total: ${K(k.amount)}, to pay at the lodge on arrival (cash or mobile money).`;
+  return { subject:`Vetus Lodge ${br.name}: booking ${k.ref} confirmed`, text:`Hello ${first(k.guest_name)}, your room at Vetus Lodge ${br.name} is CONFIRMED.\n${stay}\n${pay}\nWe look forward to welcoming you!` };
+}
+const sendLinks = (k, kind, reason) => { const m = guestMsg(k, kind, reason), wa = waNum(k.guest_phone);
+  return `${wa?`<a class="btn small primary" href="https://wa.me/${wa}?text=${encodeURIComponent(m.text)}" target="_blank" rel="noopener">WhatsApp guest</a>`:""}${k.guest_email?` <a class="btn small" href="mailto:${encodeURIComponent(k.guest_email)}?subject=${encodeURIComponent(m.subject)}&body=${encodeURIComponent(m.text)}">Email guest</a>`:""}`; };
+const payPill = k => k.pay_option!=="now" ? '<span class="pill neutral">Pays at lodge</span>'
+  : k.paid_at ? `<span class="pill ok">Paid ${K(k.pay_amount)}</span>` : `<span class="pill warn">Pay now ${K(k.pay_amount)} · awaiting</span>`;
 
 /* ---------- Views: auth ---------- */
 function topBar(){
@@ -164,7 +183,7 @@ function tabsFor(){
   return r==="admin" ? [...t,["admin","Settings"]] : t;
 }
 function shell(){
-  return `<header class="bar">${topBar()}<nav class="nav" aria-label="Sections">${tabsFor().map(([k,l])=>{ const n = k==="bookings"&&A.loaded ? arrivalsToday(A.branch).length : 0; return `<button data-act="tab" data-tab="${k}" aria-current="${A.tab===k?"page":"false"}">${l}${n?` <span class="badge" aria-label="${n} arriving today">${n}</span>`:""}</button>`; }).join("")}</nav></header>
+  return `<header class="bar">${topBar()}<nav class="nav" aria-label="Sections">${tabsFor().map(([k,l])=>{ const n = k==="bookings"&&A.loaded ? new Set([...arrivalsToday(A.branch),...pendingReq(A.branch)].map(x=>x.id)).size : 0; return `<button data-act="tab" data-tab="${k}" aria-current="${A.tab===k?"page":"false"}">${l}${n?` <span class="badge" aria-label="${n} bookings need attention">${n}</span>`:""}</button>`; }).join("")}</nav></header>
   ${demoBanner()}<main>${!A.loaded?'<p class="muted"><span class="spin"></span> Loading…</p>':view()}</main>`;
 }
 function demoBanner(){
@@ -192,6 +211,7 @@ function todayView(){
   return `<div class="head"><div><h1>Today at ${esc(s.name)}</h1><p class="meta">${fmtDay(today)} · ${syncLine(bid)}</p></div>
     <div style="display:flex;gap:.5rem;flex-wrap:wrap"><button class="btn" data-act="refresh">Refresh</button>${canPay&&isDemo(bid)?`<button class="btn" data-act="demoSamples">Add 3 sample guests</button>`:""}${canPay?`<button class="btn primary" data-act="manual">Add check-in</button>`:""}</div></div>
   ${Y.status==="due"||Y.status==="overdue"?`<div class="panel stripe ${Y.status==="overdue"?"bad":"warn"}"><div class="panel-h"><div><h2>Yesterday's deposit: ${K(Y.t.total)}</h2><p class="muted small">${fmtDay(y)} must be paid by 10:00 today.${Y.t.unpaid.length?` <b style="color:var(--red)">${Y.t.unpaid.length} check-in(s) from ${fmtDay(y)} have no payment recorded. Record them on the Deposit tab.</b>`:""}</p></div><button class="btn primary" data-act="tab" data-tab="deposit">Go to deposit</button></div></div>`:""}
+  ${pendingReq(bid).length?`<div class="panel stripe bad"><div class="panel-h"><div><h2>${pendingReq(bid).length} booking request${pendingReq(bid).length>1?"s":""} to confirm</h2><p class="muted small">Guests are waiting for a reply.</p></div><button class="btn primary" data-act="tab" data-tab="bookings">Answer now</button></div></div>`:""}
   ${arrivalsToday(bid).length?`<div class="panel stripe warn"><div class="panel-h"><div><h2>Arriving today: ${arrivalsToday(bid).length} online booking${arrivalsToday(bid).length>1?"s":""}</h2><p class="muted small">${arrivalsToday(bid).map(k=>esc(k.guest_name)+" ("+esc(k.ref)+")").join(" · ")}</p></div><button class="btn primary" data-act="tab" data-tab="bookings">Open bookings</button></div></div>`:""}
   <div class="kpis">
     <div class="kpi"><div class="l">Check-ins</div><div class="v">${T.count}</div><div class="s">${pct(T.count/s.room_count)} of ${s.room_count} rooms</div></div>
@@ -247,26 +267,40 @@ function depositView(){
 function bookingsView(){
   const ids = scopeIds(), multi = ids.length>1, t = dayKey(Date.now()), canAct = ["reception","manager","admin"].includes(A.me.role);
   const mine = A.D.bookings.filter(k=>ids.includes(k.branch_id));
-  const due = mine.filter(k=>k.status==="booked" && k.arrive<=t);
-  const next = mine.filter(k=>k.status==="booked" && k.arrive>t);
+  const reqs = mine.filter(k=>k.status==="booked" && !k.confirmed);
+  const due = mine.filter(k=>k.status==="booked" && k.confirmed && k.arrive<=t);
+  const next = mine.filter(k=>k.status==="booked" && k.confirmed && k.arrive>t);
   const done = mine.filter(k=>k.status!=="booked").sort((a,b)=>String(b.handled_at||b.created_at).localeCompare(String(a.handled_at||a.created_at))).slice(0,20);
-  const exp = next.filter(k=>k.arrive<=addDaysKey(t,7));
-  const row = (k, actions) => `<tr><td><b>${esc(k.guest_name)}</b><div class="small muted num">${esc(k.ref)} · ${telLink(k.guest_phone)}${k.guest_email?" · "+esc(k.guest_email):""}</div>${k.note?`<div class="small">“${esc(k.note)}”</div>`:""}</td>
-    ${multi?`<td>${esc(site(k.branch_id).name)}</td>`:""}<td class="num">${fmtDay(k.arrive)} → ${fmtDay(k.depart)}${k.arrive<t&&k.status==="booked"?' <span class="pill bad">Late</span>':""}</td>
-    <td class="r num">${k.nights} · ${k.guests} guest${k.guests>1?"s":""}</td><td class="r num"><b>${K(k.amount)}</b></td>
-    <td>${actions && canAct ? `<div style="display:flex;gap:.35rem;flex-wrap:wrap"><button class="btn small primary" data-act="bkCheckin" data-id="${k.id}">Check in</button><button class="btn small" data-act="bkStatus" data-id="${k.id}" data-v="no_show">No-show</button><button class="btn small" data-act="bkStatus" data-id="${k.id}" data-v="cancelled">Cancel</button></div>` : actions ? BSTAT[k.status] : BSTAT[k.status]}</td></tr>`;
-  const table = (list, actions, empty) => list.length ? `<div class="tbl-wrap"><table><thead><tr><th>Guest</th>${multi?"<th>Branch</th>":""}<th>Stay</th><th class="r">Nights</th><th class="r">To pay</th><th></th></tr></thead><tbody>${list.map(k=>row(k,actions)).join("")}</tbody></table></div>` : `<p class="muted">${empty}</p>`;
-  return `<div class="head"><div><h1>Online bookings</h1><p class="meta">Guests book at <b>www.vetuslodge.vip/book</b> and pay at the lodge on arrival.</p></div>
+  const exp = [...next, ...due].filter(k=>k.arrive<=addDaysKey(t,7));
+  const btn = (act, k, label, cls="") => `<button class="btn small ${cls}" data-act="${act}" data-id="${k.id}">${label}</button>`;
+  const actions = (k, mode) => {
+    if (!canAct) return k.status==="booked" ? payPill(k) : BSTAT[k.status];
+    const paid = k.pay_option==="now" && !k.paid_at ? btn("bkPaid", k, "Payment received") : "";
+    if (mode==="req") return btn("bkConfirm", k, "Confirm", "primary") + btn("bkDecline", k, "Decline");
+    if (mode==="due") return btn("bkCheckin", k, "Check in", "primary") + paid + btn("bkStatus\" data-v=\"no_show", k, "No-show") + btn("bkStatus\" data-v=\"cancelled", k, "Cancel");
+    if (mode==="next") return paid + btn("bkResend", k, "Message guest") + btn("bkStatus\" data-v=\"cancelled", k, "Cancel");
+    return BSTAT[k.status];
+  };
+  const row = (k, mode) => `<tr><td><b>${esc(k.guest_name)}</b><div class="small muted num">${esc(k.ref)} · ${telLink(k.guest_phone)}${k.guest_email?" · "+esc(k.guest_email):""}</div>${k.note?`<div class="small">“${esc(k.note)}”</div>`:""}${k.decline_reason?`<div class="small muted">Declined: ${esc(k.decline_reason)}</div>`:""}</td>
+    ${multi?`<td>${esc(site(k.branch_id).name)}</td>`:""}<td class="num">${fmtDay(k.arrive)} → ${fmtDay(k.depart)}${k.arrive<t&&k.status==="booked"?' <span class="pill bad">Late</span>':""}<div class="small muted">${nights(k)} · ${k.guests} guest${k.guests>1?"s":""}</div></td>
+    <td>${payPill(k)}${k.paid_ref?`<div class="small muted num">${esc(k.paid_ref)}</div>`:""}</td>
+    <td class="r num"><b>${K(k.pay_option==="now"?k.pay_amount:k.amount)}</b></td>
+    <td><div style="display:flex;gap:.35rem;flex-wrap:wrap">${actions(k, mode)}</div></td></tr>`;
+  const table = (list, mode, empty) => list.length ? `<div class="tbl-wrap"><table><thead><tr><th>Guest</th>${multi?"<th>Branch</th>":""}<th>Stay</th><th>Payment</th><th class="r">Amount</th><th></th></tr></thead><tbody>${list.map(k=>row(k,mode)).join("")}</tbody></table></div>` : `<p class="muted">${empty}</p>`;
+  return `<div class="head"><div><h1>Online bookings</h1><p class="meta">Guests request rooms at <b>www.vetuslodge.vip/book</b>. Confirm each request, then send the guest the confirmation.</p></div>
     <div style="display:flex;gap:.5rem;flex-wrap:wrap"><button class="btn" data-act="refresh">Refresh</button><a class="btn" href="/book/${A.branch!=="ALL"?"?b="+A.branch:""}" target="_blank" rel="noopener">Open booking page</a></div></div>
   <div class="kpis">
-    <div class="kpi"><div class="l">Arriving today</div><div class="v">${due.length}</div><div class="s">${due.length?K(due.reduce((a,k)=>a+Number(k.amount),0))+" expected":"None due"}</div></div>
-    <div class="kpi"><div class="l">Next 7 days</div><div class="v">${exp.length}</div><div class="s">${K(exp.reduce((a,k)=>a+Number(k.amount),0))} expected</div></div>
-    <div class="kpi"><div class="l">All upcoming</div><div class="v">${next.length}</div><div class="s">${next.reduce((a,k)=>a+k.nights,0)} room-nights held</div></div>
+    <div class="kpi"><div class="l">New requests</div><div class="v" style="color:${reqs.length?"var(--red)":"inherit"}">${reqs.length}</div><div class="s">${reqs.length?"Waiting for you to confirm":"All answered"}</div></div>
+    <div class="kpi"><div class="l">Arriving today</div><div class="v">${due.length}</div><div class="s">${due.length?K(due.reduce((a,k)=>a+Number(k.pay_amount||k.amount),0))+" expected":"None due"}</div></div>
+    <div class="kpi"><div class="l">Next 7 days</div><div class="v">${exp.length}</div><div class="s">${K(exp.reduce((a,k)=>a+Number(k.pay_amount||k.amount),0))} expected</div></div>
+    <div class="kpi"><div class="l">Paid in advance</div><div class="v">${mine.filter(k=>k.status==="booked"&&k.paid_at).length}</div><div class="s">${K(mine.filter(k=>k.status==="booked"&&k.paid_at).reduce((a,k)=>a+Number(k.pay_amount),0))} received</div></div>
   </div>
-  <section class="panel"><h2>Arriving today</h2>${table(due, true, "No booked guests due today.")}
-    <p class="small muted">When the guest arrives: issue the card in DS668, then tap <b>Check in</b> and enter the room. The stay then appears on Today for payment.</p></section>
-  <section class="panel"><h2>Upcoming</h2>${table(next, false, "No upcoming bookings yet.")}</section>
-  ${done.length?`<section class="panel"><h2>Recently handled</h2>${table(done, false, "")}</section>`:""}`;
+  <section class="panel ${reqs.length?"stripe warn":""}"><h2>New requests</h2>${table(reqs, "req", "No new requests.")}
+    <p class="small muted">Check a room is free for those dates, then tap <b>Confirm</b> and send the guest the confirmation on WhatsApp or email.</p></section>
+  <section class="panel"><h2>Arriving today</h2>${table(due, "due", "No confirmed guests due today.")}
+    <p class="small muted">When the guest arrives: issue the card in DS668, then tap <b>Check in</b> and enter the room. A guest who paid in advance is checked in as already paid.</p></section>
+  <section class="panel"><h2>Upcoming</h2>${table(next, "next", "No upcoming confirmed bookings.")}</section>
+  ${done.length?`<section class="panel"><h2>Recently handled</h2>${table(done, "done", "")}</section>`:""}`;
 }
 
 /* Deposits table */
@@ -330,6 +364,8 @@ function overviewView(){
   const alerts = [];
   per.forEach(({s,m})=>{ if (m.overdue) alerts.push(["bad",`<b>${esc(s.name)}</b>: ${m.overdue} deposit${m.overdue>1?"s":""} not paid by 10:00 (${K(m.outstanding)}).`]); });
   const arr = arrivalsToday("ALL").filter(k=>ids.includes(k.branch_id));
+  const rq = pendingReq("ALL").filter(k=>ids.includes(k.branch_id));
+  if (rq.length) alerts.push(["bad",`${rq.length} online booking request${rq.length>1?"s":""} waiting to be confirmed. <button class="btn small" data-act="tab" data-tab="bookings">Answer</button>`]);
   if (arr.length) alerts.push(["warn",`${arr.length} online booking${arr.length>1?"s":""} arriving today (${K(arr.reduce((a,k)=>a+Number(k.amount),0))} expected). <button class="btn small" data-act="tab" data-tab="bookings">View</button>`]);
   if (pend) alerts.push(["warn",`${pend} waiver${pend>1?"s":""} awaiting director confirmation. <button class="btn small" data-act="tab" data-tab="waivers">Review</button>`]);
   const card = ({s,j,m}) => `<section class="panel stripe ${m.overdue?"bad":m.outstanding?"warn":"ok"}">
@@ -416,11 +452,12 @@ function adminView(){
       <label class="f">Temporary password<input id="nu-pw" type="text" minlength="8" autocomplete="off" required></label>
       <button class="btn primary" type="submit">Add user</button></form>
     <p class="small muted">Give the person their username and temporary password in person. They must change it the first time they sign in.</p></section>`;
-  if (A.adminTab==="branches") body = `<section class="panel"><h2>Branches & room rates</h2><div class="tbl-wrap"><table><thead><tr><th>Branch</th><th class="r">Rooms</th><th class="r">Rate per night (K)</th><th>Reception number</th><th>WhatsApp for bookings</th><th>Online booking</th></tr></thead><tbody>
+  if (A.adminTab==="branches") body = `<section class="panel"><h2>Branches & room rates</h2><div class="tbl-wrap"><table><thead><tr><th>Branch</th><th class="r">Rooms</th><th class="r">Rate per night (K)</th><th>Reception number</th><th>WhatsApp for bookings</th><th>Online booking</th><th class="r">Pay-now discount %</th></tr></thead><tbody>
     ${A.branches.map(b=>`<tr><td><b>${esc(b.name)}</b></td><td class="r num">${b.room_count}</td><td class="r"><input type="number" id="rate-${b.id}" data-act="rate" data-id="${b.id}" value="${Number(b.rate)}" min="0" step="10" style="max-width:110px;text-align:right"></td>
       <td><input type="text" id="sim-${b.id}" data-act="sim" data-id="${b.id}" value="${esc(b.reception_number||"")}" placeholder="09xx xxx xxx" style="max-width:160px"></td>
       <td><input type="text" data-act="wa" data-id="${b.id}" value="${esc(b.whatsapp_number||"")}" placeholder="Same as reception" style="max-width:160px"></td>
-      <td><select data-act="bkOpen" data-id="${b.id}" style="max-width:120px"><option value="1" ${b.booking_open?"selected":""}>Open</option><option value="0" ${b.booking_open?"":"selected"}>Closed</option></select></td></tr>`).join("")}
+      <td><select data-act="bkOpen" data-id="${b.id}" style="max-width:120px"><option value="1" ${b.booking_open?"selected":""}>Open</option><option value="0" ${b.booking_open?"":"selected"}>Closed</option></select></td>
+      <td class="r"><input type="number" data-act="disc" data-id="${b.id}" value="${Number(b.prepay_discount??5)}" min="0" max="50" step="1" style="max-width:80px;text-align:right"></td></tr>`).join("")}
     </tbody></table></div><p class="small muted">A new rate applies to check-ins from now on. Rates are still the DS668 default of K199 until you set the real ones.</p></section>`;
   if (A.adminTab==="sync") body = `<section class="panel"><h2>DS668 sync</h2><div class="tbl-wrap"><table><thead><tr><th>Branch</th><th>Status</th><th>Latest DS668 guest</th></tr></thead><tbody>
     ${A.branches.map(b=>{ const s=A.D.sync.find(x=>x.branch_id===b.id); return `<tr><td><b>${esc(b.name)}</b></td><td class="small">${syncLine(b.id)}</td><td class="num">${s?("#"+s.last_ds_guest_id):"–"}</td></tr>`; }).join("")}
@@ -473,6 +510,19 @@ function modalView(){
       ${m.ref?`<p class="small muted">${fmtDay(m.k)} is now deposited and locked. Demo mode: no real money moved.</p><div class="actions"><button class="btn primary" data-act="close">Done</button></div>`:m.err?`<div class="actions"><button class="btn" data-act="close">Close</button></div>`:""}
     </div></div>`;
   }
+  if (m.type==="bkDecline"){ const k = A.D.bookings.find(x=>x.id===m.id); return wrap(`<h2>Decline ${esc(k.guest_name)}'s request</h2>
+    <p class="muted small">${esc(k.ref)} · ${fmtDay(k.arrive)} → ${fmtDay(k.depart)}. The room is released straight away.</p>
+    <label class="f">Reason for the guest (optional)<input id="bk-reason" type="text" placeholder="e.g. We are fully booked on those dates."></label>
+    <div class="actions"><button type="button" class="btn" data-act="close">Back</button><button class="btn primary" type="submit" style="background:var(--red);border-color:var(--red)">Decline request</button></div>`, "bkDeclineForm"); }
+  if (m.type==="bkPaid"){ const k = A.D.bookings.find(x=>x.id===m.id); return wrap(`<h2>Payment received · ${esc(k.ref)}</h2>
+    <p class="muted small">Check the reception phone shows <b>${K(k.pay_amount)}</b> from ${esc(k.guest_name)} before you confirm.</p>
+    <label class="f">Mobile money reference<input id="bk-ref" type="text" required></label>
+    <div class="actions"><button type="button" class="btn" data-act="close">Cancel</button><button class="btn primary" type="submit">Mark as paid</button></div>`, "bkPaidForm"); }
+  if (m.type==="bkSend"){ const k = A.D.bookings.find(x=>x.id===m.id); const titles = {confirm:"Booking confirmed", decline:"Request declined", paid:"Payment recorded"};
+    return `<div class="scrim"><div class="modal"><h2>${titles[m.kind]} · ${esc(k.ref)}</h2>
+    <p class="small">Now let ${esc(first(k.guest_name))} know. The message is written for you: just tap send in WhatsApp or your email app.</p>
+    <pre class="small" style="white-space:pre-wrap;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:.6rem;margin:0;font-family:inherit">${esc(guestMsg(k, m.kind, m.reason).text)}</pre>
+    <div class="actions">${sendLinks(k, m.kind, m.reason)}<button type="button" class="btn small" data-act="close">Done</button></div></div></div>`; }
   if (m.type==="bkCheckin"){ const k = A.D.bookings.find(x=>x.id===m.id); return wrap(`<h2>Check in ${esc(k.guest_name)}</h2>
     <p class="muted small">${esc(k.ref)} · ${fmtDay(k.arrive)} → ${fmtDay(k.depart)} · ${K(k.amount)}. Issue the guest card in DS668 first, then enter the room it opens.</p>
     <label class="f">Room number<input id="bk-room" type="text" inputmode="numeric" required></label>
@@ -530,6 +580,10 @@ document.addEventListener("click", async e=>{
         const d = await sb.rpc("record_test_deposit",{p_branch:A.branch, p_date:k, p_reference:ref}); if (d.error) throw d.error;
         await new Promise(r=>setTimeout(r,900)); m.ref = ref; await loadData(); render();
       } catch(err){ m.err = err.message||String(err); render(); } }
+    if (a==="bkConfirm"){ const { error } = await sb.rpc("booking_confirm",{p_booking:id}); if (error) throw error; await refresh(); A.modal={type:"bkSend", id, kind:"confirm"}; render(); }
+    if (a==="bkDecline"){ A.modal={type:"bkDecline", id}; render(); }
+    if (a==="bkPaid"){ A.modal={type:"bkPaid", id}; render(); }
+    if (a==="bkResend"){ A.modal={type:"bkSend", id, kind:"confirm"}; render(); }
     if (a==="bkCheckin"){ A.modal={type:"bkCheckin", id}; render(); }
     if (a==="bkStatus"){ const { error } = await sb.rpc("booking_set_status",{p_booking:id, p_status:b.dataset.v}); if (error) throw error; await refresh(); toast(b.dataset.v==="no_show"?"Marked as no-show":"Booking cancelled"); }
     if (a==="demoSamples"){ const { data, error } = await sb.rpc("demo_add_samples",{p_branch:A.branch}); if (error) throw error; await refresh(); toast(data+" sample guests added. Record how each one paid."); }
@@ -546,6 +600,7 @@ document.addEventListener("change", async e=>{
     if (t.dataset.act==="lipilaMode"){ const { error } = await sb.from("branches").update({lipila_mode:t.value}).eq("id", t.dataset.id); if (error) throw error; await refresh(); toast(site(t.dataset.id).name+": Lipila "+(t.value==="demo"?"demo mode on":"off")); }
     if (t.dataset.act==="gTab"){ A.guide.tab=t.value; A.guide.loaded=false; render(); await refreshGuide(); }
     if (t.dataset.act==="wa"){ const { error } = await sb.from("branches").update({whatsapp_number:t.value.trim()||null}).eq("id", t.dataset.id); if (error) throw error; await refresh(); toast("WhatsApp number saved"); }
+    if (t.dataset.act==="disc"){ const v = Math.min(50, Math.max(0, Number(t.value)||0)); const { error } = await sb.from("branches").update({prepay_discount:v}).eq("id", t.dataset.id); if (error) throw error; await refresh(); toast(site(t.dataset.id).name+": pay-now discount "+v+"%"); }
     if (t.dataset.act==="bkOpen"){ const { error } = await sb.from("branches").update({booking_open:t.value==="1"}).eq("id", t.dataset.id); if (error) throw error; await refresh(); toast(site(t.dataset.id).name+": online booking "+(t.value==="1"?"open":"closed")); }
     if (t.dataset.act==="sim"){ const { error } = await sb.from("branches").update({reception_number:t.value.trim()||null}).eq("id", t.dataset.id); if (error) throw error; await refresh(); toast("Reception number saved"); }
   } catch(err){ fail(err); }
@@ -584,6 +639,17 @@ document.addEventListener("submit", async e=>{
       const { error } = await sb.rpc("record_test_deposit",{p_branch:A.branch, p_date:A.modal.k, p_reference:document.getElementById("d-ref").value});
       if (error) return setErr(error.message);
       A.modal=null; await refresh(); toast("Deposit recorded");
+    }
+    if (f==="bkDeclineForm"){
+      const reason = document.getElementById("bk-reason").value.trim(), id = A.modal.id;
+      const { error } = await sb.rpc("booking_decline",{p_booking:id, p_reason:reason});
+      if (error) return setErr(error.message);
+      await refresh(); A.modal={type:"bkSend", id, kind:"decline", reason}; render();
+    }
+    if (f==="bkPaidForm"){
+      const id = A.modal.id, { error } = await sb.rpc("booking_mark_paid",{p_booking:id, p_ref:document.getElementById("bk-ref").value});
+      if (error) return setErr(error.message);
+      await refresh(); A.modal={type:"bkSend", id, kind:"paid"}; render();
     }
     if (f==="bkForm"){
       const { error } = await sb.rpc("booking_checkin",{p_booking:A.modal.id, p_room:document.getElementById("bk-room").value});
