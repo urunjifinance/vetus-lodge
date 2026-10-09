@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Book a Room · Vetus Lodge</title><meta name="author" content="Kalaluka Sydney Nawa">
+<meta name="description" content="Book a room at Vetus Lodge in Mumbwa, Kaoma or Kasempa. Pay at the lodge on arrival.">
+<link rel="icon" href="../logo.jpg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700;800&family=Source+Sans+3:wght@400;500;600;700&display=swap">
+<style>*{box-sizing:border-box} body{margin:0} img{max-width:100%}
+/* Layout: green hero with logo; one centred column (max 640px) holding a 3-step card: stay → details → confirmed */
+:root{
+  --bg:#F2F5F0; --surface:#FFFFFF; --surface-2:#F6F8F4; --ink:#14251A; --muted:#5B6A5E; --line:#DCE4D9;
+  --brand:#183820; --brand-2:#22492B; --red:#C92B28; --green:#2B8F1C; --gold:#C5B361; --gold-ink:#7A6420;
+  --ok-bg:#E3F3DE; --bad-bg:#F9E2E1;
+  --f-display:"Montserrat","Segoe UI",Arial,sans-serif; --f-body:"Source Sans 3","Segoe UI",Arial,sans-serif;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#0D1A11; --surface:#142619; --surface-2:#18301F; --ink:#E6EEE4; --muted:#9BAC9E; --line:#28432F;
+  --brand:#0A160D; --brand-2:#183820; --red:#EA5D59; --green:#52C93C; --gold:#D3C07A; --gold-ink:#E2CF86;
+  --ok-bg:#1C391B; --bad-bg:#45201F; color-scheme:dark }}
+:root[data-theme="dark"]{
+  --bg:#0D1A11; --surface:#142619; --surface-2:#18301F; --ink:#E6EEE4; --muted:#9BAC9E; --line:#28432F;
+  --brand:#0A160D; --brand-2:#183820; --red:#EA5D59; --green:#52C93C; --gold:#D3C07A; --gold-ink:#E2CF86;
+  --ok-bg:#1C391B; --bad-bg:#45201F; color-scheme:dark }
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:16px;line-height:1.5}
+h1,h2,h3{font-family:var(--f-display);margin:0;letter-spacing:-.01em;text-wrap:balance}
+p{margin:0}
+.wrap{max-width:640px;margin:0 auto;padding-inline:16px}
+.hero{background:var(--brand);color:#fff;border-bottom:4px solid var(--gold);padding-block:1.8rem 3.6rem;text-align:center}
+.hero img{width:86px;height:86px;border-radius:50%;object-fit:cover;object-position:center 32%;border:3px solid var(--gold)}
+.eyebrow{font-size:.75rem;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--gold);margin-top:.8rem}
+.hero h1{font-size:clamp(1.7rem,5vw,2.3rem);font-weight:800;line-height:1.1;margin-top:.2rem}
+.hero p{opacity:.85;margin-top:.45rem}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:1.2rem;margin-top:-2.4rem;box-shadow:0 10px 30px rgba(20,37,26,.08);display:grid;gap:1.1rem}
+.steps{display:flex;gap:.4rem;font-size:.8rem;font-weight:700;color:var(--muted)}
+.steps span{flex:1;text-align:center;padding:.35rem;border-radius:99px;background:var(--surface-2);border:1px solid var(--line)}
+.steps span.on{background:var(--brand-2);color:#fff;border-color:var(--brand-2)}
+.lbl{font-weight:700;font-size:.92rem;display:block;margin-bottom:.35rem}
+.branches{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:.5rem}
+.branch{font:inherit;text-align:left;border:1.5px solid var(--line);background:var(--surface);color:var(--ink);border-radius:12px;padding:.7rem .8rem;cursor:pointer}
+.branch b{font-family:var(--f-display);display:block}
+.branch small{color:var(--muted)}
+.branch[aria-pressed="true"]{border-color:var(--green);background:var(--ok-bg)}
+.branch:disabled{opacity:.5;cursor:not-allowed}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:.7rem}
+@media (max-width:420px){ .row{grid-template-columns:1fr} }
+input,select,textarea{font:inherit;color:var(--ink);background:var(--surface);border:1.5px solid var(--line);border-radius:10px;padding:.6rem .7rem;width:100%;min-width:0}
+input:focus,select:focus,textarea:focus,.branch:focus-visible,.btn:focus-visible{outline:3px solid var(--gold);outline-offset:1px}
+textarea{min-height:4.5rem;resize:vertical}
+.btn{font:inherit;font-weight:700;border:0;border-radius:12px;padding:.85rem 1rem;cursor:pointer;background:var(--brand-2);color:#fff;width:100%;display:inline-flex;justify-content:center;align-items:center;gap:.5rem;text-decoration:none}
+.btn.go{background:var(--green)}
+.btn.ghost{background:transparent;color:var(--ink);border:1.5px solid var(--line)}
+.btn:disabled{opacity:.6;cursor:wait}
+.quote{border-radius:12px;padding:.9rem 1rem;display:grid;gap:.35rem}
+.quote.ok{background:var(--ok-bg)}
+.quote.bad{background:var(--bad-bg)}
+.sum{display:flex;justify-content:space-between;gap:1rem}
+.sum .v{font-weight:700;font-variant-numeric:tabular-nums}
+.total{font-family:var(--f-display);font-size:1.3rem;font-weight:800}
+.muted{color:var(--muted)} .small{font-size:.9rem}
+.err{color:var(--red);font-weight:700}
+.ref{font-family:var(--f-display);font-size:2rem;font-weight:800;letter-spacing:.06em;text-align:center;padding:.6rem;border:2px dashed var(--gold);border-radius:12px;font-variant-numeric:tabular-nums}
+.tick{width:56px;height:56px;border-radius:50%;background:var(--ok-bg);color:var(--green);display:grid;place-items:center;margin:0 auto;font-size:1.8rem;font-weight:800}
+footer{text-align:center;color:var(--muted);font-size:.85rem;padding:1.6rem 16px 2.4rem}
+footer a{color:inherit}
+.spin{width:1em;height:1em;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:sp .7s linear infinite}
+@keyframes sp{to{transform:rotate(1turn)}}
+@media (prefers-reduced-motion:reduce){.spin{animation:none}}
+</style></head>
+<body>
+<header class="hero"><div class="wrap">
+  <img src="../logo.jpg" alt="Vetus Lodge logo">
+  <div class="eyebrow">Mumbwa · Kaoma · Kasempa</div>
+  <h1>Book your stay at Vetus Lodge</h1>
+  <p>Reserve a room in under a minute. You pay at the lodge when you arrive.</p>
+</div></header>
+<main class="wrap"><div class="card" id="app" aria-live="polite"><p class="muted"><span class="spin" style="display:inline-block;vertical-align:-2px"></span> Loading…</p></div></main>
+<footer>Check-out is at 10:00. Questions? Contact the lodge on WhatsApp after booking.<br>Staff? <a href="../">Sign in to the app</a></footer>
+<script src="../supabase.js"></script>
+<script>
+const sb = supabase.createClient("https://csmtjttaeibqesgymxfs.supabase.co", "sb_publishable_t1AeDZDr6_czlrU4NxWZNw_ri712Jnr");
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const K = n => "K" + Math.round(Number(n)||0).toLocaleString("en-ZM");
+const todayKey = () => new Intl.DateTimeFormat("en-CA",{timeZone:"Africa/Lusaka"}).format(new Date());
+const addDays = (k,n) => { const d = new Date(k+"T12:00:00Z"); d.setUTCDate(d.getUTCDate()+n); return d.toISOString().slice(0,10); };
+const nice = k => new Date(k+"T12:00:00Z").toLocaleDateString("en-GB",{weekday:"short",day:"numeric",month:"short",year:"numeric",timeZone:"UTC"});
+const waNum = s => { let d = String(s||"").replace(/\D/g,""); if (!d) return ""; if (d.startsWith("0")) d = "260" + d.slice(1); else if (d.length === 9) d = "260" + d; return d; };
+const errMsg = e => (e && e.message) ? e.message : "Something went wrong. Please try again.";
+
+const S = { step:1, branches:[], branch:new URLSearchParams(location.search).get("b"), arrive:todayKey(), depart:addDays(todayKey(),1), guests:1, quote:null, busy:false, err:"", done:null, form:{name:"",phone:"",email:"",note:""} };
+const $app = document.getElementById("app");
+
+function stepsBar(){ return `<div class="steps" aria-hidden="true">${["Your stay","Your details","Confirmed"].map((t,i)=>`<span class="${S.step===i+1?"on":""}">${i+1}. ${t}</span>`).join("")}</div>`; }
+function render(){
+  if (S.step===3) return renderDone();
+  if (S.step===2) return renderDetails();
+  const b = S.branches.find(x=>x.id===S.branch);
+  $app.innerHTML = `${stepsBar()}
+  <div><span class="lbl" id="bl">Branch</span><div class="branches" role="group" aria-labelledby="bl">
+    ${S.branches.map(x=>`<button class="branch" data-b="${esc(x.id)}" aria-pressed="${x.id===S.branch}" ${x.booking_open?"":"disabled"}><b>${esc(x.name)}</b><small>${x.booking_open?`${K(x.rate)} per night`:"Call to book"}</small></button>`).join("")}
+  </div></div>
+  <div class="row">
+    <label><span class="lbl">Check-in</span><input type="date" id="arrive" value="${S.arrive}" min="${todayKey()}" max="${addDays(todayKey(),180)}"></label>
+    <label><span class="lbl">Check-out</span><input type="date" id="depart" value="${S.depart}" min="${addDays(S.arrive,1)}" max="${addDays(S.arrive,30)}"></label>
+  </div>
+  <label style="max-width:200px"><span class="lbl">Guests</span><select id="guests">${[1,2,3,4,5,6].map(n=>`<option ${n==S.guests?"selected":""}>${n}</option>`).join("")}</select></label>
+  ${S.quote ? quoteBox() : ""}
+  ${S.err?`<p class="err">${esc(S.err)}</p>`:""}
+  ${S.quote && S.quote.free>0
+    ? `<button class="btn go" data-act="next">Continue · ${K(S.quote.amount)} for ${S.quote.nights} night${S.quote.nights>1?"s":""}</button>`
+    : `<button class="btn" data-act="check" ${!b||S.busy?"disabled":""}>${S.busy?'<span class="spin"></span> Checking':"Check availability"}</button>`}
+  ${!b?'<p class="small muted">Choose a branch to continue.</p>':""}`;
+}
+function quoteBox(){
+  const q = S.quote;
+  if (q.free < 1) return `<div class="quote bad"><b>Sorry, ${esc(q.branch)} is full for those dates.</b><span class="small">Try other dates or another branch.</span></div>`;
+  return `<div class="quote ok"><b>✓ Rooms available at ${esc(q.branch)}</b>
+    <div class="sum small"><span>${nice(S.arrive)} → ${nice(S.depart)}</span><span class="v">${q.nights} night${q.nights>1?"s":""}</span></div>
+    <div class="sum small"><span>${K(q.rate)} × ${q.nights}</span><span class="v">${K(q.amount)}</span></div>
+    <div class="sum"><span class="total">Total</span><span class="total">${K(q.amount)}</span></div>
+    <span class="small muted">Pay at the lodge on arrival, by cash or mobile money. Nothing to pay now.</span></div>`;
+}
+function renderDetails(){
+  const q = S.quote, f = S.form;
+  $app.innerHTML = `${stepsBar()}
+  <div class="quote ok small"><div class="sum"><b>${esc(q.branch)} · ${q.nights} night${q.nights>1?"s":""}</b><b>${K(q.amount)}</b></div><span>${nice(S.arrive)} → ${nice(S.depart)} · ${S.guests} guest${S.guests>1?"s":""}</span></div>
+  <form id="details" style="display:grid;gap:.9rem" novalidate>
+    <label><span class="lbl">Full name</span><input id="name" autocomplete="name" required value="${esc(f.name)}"></label>
+    <label><span class="lbl">Phone number</span><input id="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="e.g. 0977 123 456" required value="${esc(f.phone)}"></label>
+    <label><span class="lbl">Email <span class="muted" style="font-weight:400">(optional)</span></span><input id="email" type="email" autocomplete="email" value="${esc(f.email)}"></label>
+    <label><span class="lbl">Anything we should know? <span class="muted" style="font-weight:400">(optional)</span></span><textarea id="note" maxlength="300" placeholder="e.g. arriving late, about 21:00">${esc(f.note)}</textarea></label>
+    ${S.err?`<p class="err">${esc(S.err)}</p>`:""}
+    <button class="btn go" type="submit" ${S.busy?"disabled":""}>${S.busy?'<span class="spin"></span> Booking':"Confirm booking"}</button>
+    <button class="btn ghost" type="button" data-act="back">Back</button>
+    <p class="small muted">By booking you agree the lodge may contact you on this number about your stay.</p>
+  </form>`;
+}
+function renderDone(){
+  const d = S.done, b = S.branches.find(x=>x.id===S.branch) || {}, wa = waNum(b.whatsapp);
+  const msg = `Hello Vetus Lodge ${d.branch}, I have booked online.\nRef: ${d.ref}\nName: ${d.name}\nCheck-in: ${nice(S.arrive)}\nCheck-out: ${nice(S.depart)}\nNights: ${d.nights}\nTotal: ${K(d.amount)} (pay on arrival)`;
+  $app.innerHTML = `${stepsBar()}
+  <div class="tick" aria-hidden="true">✓</div>
+  <div style="text-align:center"><h2>You're booked, ${esc(d.name.split(" ")[0])}!</h2><p class="muted" style="margin-top:.3rem">Show this reference at reception when you arrive.</p></div>
+  <div class="ref" aria-label="Booking reference">${esc(d.ref)}</div>
+  <div class="quote ok small">
+    <div class="sum"><span>Branch</span><b>Vetus Lodge ${esc(d.branch)}</b></div>
+    <div class="sum"><span>Check-in</span><b>${nice(S.arrive)}</b></div>
+    <div class="sum"><span>Check-out</span><b>${nice(S.depart)}, 10:00</b></div>
+    <div class="sum"><span>Guests</span><b>${S.guests}</b></div>
+    <div class="sum"><span class="total">To pay on arrival</span><span class="total">${K(d.amount)}</span></div>
+  </div>
+  ${wa?`<a class="btn go" href="https://wa.me/${wa}?text=${encodeURIComponent(msg)}" target="_blank" rel="noopener">Send booking to the lodge on WhatsApp</a>`:""}
+  <button class="btn ghost" data-act="again">Make another booking</button>
+  <p class="small muted" style="text-align:center">Take a screenshot of this page to keep your reference.</p>`;
+}
+
+document.addEventListener("click", async e=>{
+  const t = e.target.closest("[data-b],[data-act]"); if (!t) return;
+  if (t.dataset.b){ S.branch=t.dataset.b; S.quote=null; S.err=""; history.replaceState(null,"","?b="+S.branch); render(); return; }
+  const a = t.dataset.act;
+  if (a==="check"){ readStay(); S.busy=true; S.err=""; S.quote=null; render();
+    const { data, error } = await sb.rpc("booking_quote",{p_branch:S.branch, p_arrive:S.arrive, p_depart:S.depart});
+    S.busy=false; if (error) S.err = errMsg(error); else S.quote = data; render(); }
+  if (a==="next"){ S.step=2; S.err=""; render(); document.getElementById("name").focus(); }
+  if (a==="back"){ readForm(); S.step=1; S.err=""; render(); }
+  if (a==="again"){ S.step=1; S.quote=null; S.done=null; S.err=""; render(); }
+});
+document.addEventListener("change", e=>{
+  if (S.step!==1 || !["arrive","depart","guests"].includes(e.target.id)) return;
+  readStay();
+  if (S.depart <= S.arrive) S.depart = addDays(S.arrive,1);
+  S.quote=null; S.err=""; render();
+});
+document.addEventListener("submit", async e=>{
+  if (e.target.id!=="details") return; e.preventDefault(); readForm();
+  if (S.form.name.trim().length<2) { S.err="Please enter your full name."; return render(); }
+  if (S.form.phone.replace(/\D/g,"").length<9) { S.err="Please enter a valid phone number."; return render(); }
+  S.busy=true; S.err=""; render();
+  const { data, error } = await sb.rpc("create_booking",{p_branch:S.branch, p_arrive:S.arrive, p_depart:S.depart, p_guests:Number(S.guests),
+    p_name:S.form.name, p_phone:S.form.phone, p_email:S.form.email||null, p_note:S.form.note||null});
+  S.busy=false;
+  if (error){ S.err = errMsg(error); return render(); }
+  S.done = data; S.step=3; S.form={name:"",phone:"",email:"",note:""}; render(); window.scrollTo({top:0,behavior:"smooth"});
+});
+function readStay(){ const g=id=>document.getElementById(id); if (g("arrive")){ S.arrive=g("arrive").value||S.arrive; S.depart=g("depart").value||S.depart; S.guests=g("guests").value; } }
+function readForm(){ const g=id=>(document.getElementById(id)||{}).value||""; S.form={name:g("name"),phone:g("phone"),email:g("email"),note:g("note")}; }
+
+(async function(){
+  const { data, error } = await sb.rpc("public_branches");
+  if (error){ $app.innerHTML = `<p class="err">Booking is not available right now. Please try again later.</p>`; return; }
+  S.branches = data;
+  if (!S.branches.some(b=>b.id===S.branch && b.booking_open)) S.branch = null;
+  render();
+})();
+</script>
+</body></html>

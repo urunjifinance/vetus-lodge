@@ -15,7 +15,7 @@ const ROLES = {reception:"Reception", manager:"Manager", director:"Director", ad
 const pct = v => v==null || !isFinite(v) ? "–" : Math.round(v*100)+"%";
 
 const A = {me:null, branches:[], branch:null, tab:null, period:"week", modal:null, toast:null, err:"", busy:false, adminTab:"users", guide:{tab:"start", rows:[], loaded:false},
-  D:{checkins:[], waivers:[], deposits:[], sync:[], directors:[], profiles:[]}, loaded:false};
+  D:{checkins:[], waivers:[], deposits:[], sync:[], directors:[], profiles:[], bookings:[]}, loaded:false};
 
 const $app = document.getElementById("app");
 function render(){
@@ -54,6 +54,8 @@ async function loadData(){
   ]);
   for (const r of [c,d,s,dir]) if (r.error) throw r.error;
   A.D.checkins = c.data; A.D.deposits = d.data; A.D.sync = s.data; A.D.directors = dir.data;
+  const bk = await sb.from("bookings").select("*").in("branch_id", ids).gte("depart", addDaysKey(today,-7)).order("arrive").order("created_at");
+  if (bk.error) throw bk.error; A.D.bookings = bk.data;
   const cids = c.data.map(x=>x.id);
   A.D.waivers = [];
   if (cids.length){ const w = await sb.from("waivers").select("*").in("checkin_id", cids); if (w.error) throw w.error; A.D.waivers = w.data; }
@@ -99,6 +101,11 @@ function syncLine(bid){
   return mins > 15 ? `<b style="color:var(--red)">DS668 sync last seen ${mins} min ago</b>` : `DS668 synced ${mins} min ago`;
 }
 
+/* Bookings helpers */
+const arrivalsToday = bid => { const t = dayKey(Date.now()); return A.D.bookings.filter(k=>(bid==="ALL"||k.branch_id===bid) && k.status==="booked" && k.arrive<=t); };
+const BSTAT = {booked:'<span class="pill warn">Booked</span>', checked_in:'<span class="pill ok">Checked in</span>', cancelled:'<span class="pill neutral">Cancelled</span>', no_show:'<span class="pill bad">No-show</span>'};
+const telLink = n => `<a href="tel:${esc(n)}">${esc(n)}</a>`;
+
 /* ---------- Views: auth ---------- */
 function topBar(){
   const br = !A.branch ? "None" : A.branch==="ALL" ? "All branches" : site(A.branch).name;
@@ -120,6 +127,7 @@ function loginView(){
     ${A.err?`<p class="err">${esc(A.err)}</p>`:""}
     <button class="btn primary" type="submit" style="justify-content:center" ${A.busy?"disabled":""}>${A.busy?'<span class="spin"></span> Signing in':"Sign in"}</button>
     <p class="small muted">Forgot your password? Ask the system admin to reset it.</p>
+    <p class="small muted">Guest looking for a room? <a href="/book/">Book online</a></p>
   </form></div></div>`;
 }
 function changePwView(){
@@ -150,13 +158,13 @@ function branchPicker(){
 /* ---------- Shell + tabs ---------- */
 function tabsFor(){
   const r = A.me.role;
-  if (A.branch==="ALL") return r==="admin" ? [["dash","Overview"],["deposits","Deposits"],["waivers","Waivers"],["admin","Settings"]] : [["dash","Overview"],["deposits","Deposits"],["waivers","Waivers"]];
-  if (r==="reception") return [["today","Today"],["deposit","Deposit"],["deposits","History"]];
-  const t = [["today","Today"],["deposit","Deposit"],["deposits","Deposits"],["waivers","Waivers"]];
+  if (A.branch==="ALL") return r==="admin" ? [["dash","Overview"],["bookings","Bookings"],["deposits","Deposits"],["waivers","Waivers"],["admin","Settings"]] : [["dash","Overview"],["bookings","Bookings"],["deposits","Deposits"],["waivers","Waivers"]];
+  if (r==="reception") return [["today","Today"],["bookings","Bookings"],["deposit","Deposit"],["deposits","History"]];
+  const t = [["today","Today"],["bookings","Bookings"],["deposit","Deposit"],["deposits","Deposits"],["waivers","Waivers"]];
   return r==="admin" ? [...t,["admin","Settings"]] : t;
 }
 function shell(){
-  return `<header class="bar">${topBar()}<nav class="nav" aria-label="Sections">${tabsFor().map(([k,l])=>`<button data-act="tab" data-tab="${k}" aria-current="${A.tab===k?"page":"false"}">${l}</button>`).join("")}</nav></header>
+  return `<header class="bar">${topBar()}<nav class="nav" aria-label="Sections">${tabsFor().map(([k,l])=>{ const n = k==="bookings"&&A.loaded ? arrivalsToday(A.branch).length : 0; return `<button data-act="tab" data-tab="${k}" aria-current="${A.tab===k?"page":"false"}">${l}${n?` <span class="badge" aria-label="${n} arriving today">${n}</span>`:""}</button>`; }).join("")}</nav></header>
   ${demoBanner()}<main>${!A.loaded?'<p class="muted"><span class="spin"></span> Loading…</p>':view()}</main>`;
 }
 function demoBanner(){
@@ -169,6 +177,7 @@ function view(){
   if (t==="admin") return adminView();
   if (t==="deposits") return depositsView();
   if (t==="waivers") return waiversView();
+  if (t==="bookings") return bookingsView();
   if (t==="dash" || A.branch==="ALL") return overviewView();
   if (t==="deposit") return depositView();
   return todayView();
@@ -183,6 +192,7 @@ function todayView(){
   return `<div class="head"><div><h1>Today at ${esc(s.name)}</h1><p class="meta">${fmtDay(today)} · ${syncLine(bid)}</p></div>
     <div style="display:flex;gap:.5rem;flex-wrap:wrap"><button class="btn" data-act="refresh">Refresh</button>${canPay&&isDemo(bid)?`<button class="btn" data-act="demoSamples">Add 3 sample guests</button>`:""}${canPay?`<button class="btn primary" data-act="manual">Add check-in</button>`:""}</div></div>
   ${Y.status==="due"||Y.status==="overdue"?`<div class="panel stripe ${Y.status==="overdue"?"bad":"warn"}"><div class="panel-h"><div><h2>Yesterday's deposit: ${K(Y.t.total)}</h2><p class="muted small">${fmtDay(y)} must be paid by 10:00 today.${Y.t.unpaid.length?` <b style="color:var(--red)">${Y.t.unpaid.length} check-in(s) from ${fmtDay(y)} have no payment recorded. Record them on the Deposit tab.</b>`:""}</p></div><button class="btn primary" data-act="tab" data-tab="deposit">Go to deposit</button></div></div>`:""}
+  ${arrivalsToday(bid).length?`<div class="panel stripe warn"><div class="panel-h"><div><h2>Arriving today: ${arrivalsToday(bid).length} online booking${arrivalsToday(bid).length>1?"s":""}</h2><p class="muted small">${arrivalsToday(bid).map(k=>esc(k.guest_name)+" ("+esc(k.ref)+")").join(" · ")}</p></div><button class="btn primary" data-act="tab" data-tab="bookings">Open bookings</button></div></div>`:""}
   <div class="kpis">
     <div class="kpi"><div class="l">Check-ins</div><div class="v">${T.count}</div><div class="s">${pct(T.count/s.room_count)} of ${s.room_count} rooms</div></div>
     <div class="kpi"><div class="l">Due today</div><div class="v">${K(T.total)}</div><div class="s">${T.waived?K(T.waived)+" waived":"No waivers"}</div></div>
@@ -231,6 +241,32 @@ function depositView(){
     <div class="sum-row"><span class="muted">Cash recorded</span><span class="num muted">${K(T.cash)}</span></div>
     <div class="sum-row"><span class="muted">Mobile money recorded</span><span class="num muted">${K(T.mobile)}</span></div>
     <div class="sum-row total"><span>${isDemo(bid)?"To deposit now (demo)":"To deposit tomorrow"}</span><span class="num">${K(T.total)}</span></div></div></section></div>`;
+}
+
+/* Bookings */
+function bookingsView(){
+  const ids = scopeIds(), multi = ids.length>1, t = dayKey(Date.now()), canAct = ["reception","manager","admin"].includes(A.me.role);
+  const mine = A.D.bookings.filter(k=>ids.includes(k.branch_id));
+  const due = mine.filter(k=>k.status==="booked" && k.arrive<=t);
+  const next = mine.filter(k=>k.status==="booked" && k.arrive>t);
+  const done = mine.filter(k=>k.status!=="booked").sort((a,b)=>String(b.handled_at||b.created_at).localeCompare(String(a.handled_at||a.created_at))).slice(0,20);
+  const exp = next.filter(k=>k.arrive<=addDaysKey(t,7));
+  const row = (k, actions) => `<tr><td><b>${esc(k.guest_name)}</b><div class="small muted num">${esc(k.ref)} · ${telLink(k.guest_phone)}${k.guest_email?" · "+esc(k.guest_email):""}</div>${k.note?`<div class="small">“${esc(k.note)}”</div>`:""}</td>
+    ${multi?`<td>${esc(site(k.branch_id).name)}</td>`:""}<td class="num">${fmtDay(k.arrive)} → ${fmtDay(k.depart)}${k.arrive<t&&k.status==="booked"?' <span class="pill bad">Late</span>':""}</td>
+    <td class="r num">${k.nights} · ${k.guests} guest${k.guests>1?"s":""}</td><td class="r num"><b>${K(k.amount)}</b></td>
+    <td>${actions && canAct ? `<div style="display:flex;gap:.35rem;flex-wrap:wrap"><button class="btn small primary" data-act="bkCheckin" data-id="${k.id}">Check in</button><button class="btn small" data-act="bkStatus" data-id="${k.id}" data-v="no_show">No-show</button><button class="btn small" data-act="bkStatus" data-id="${k.id}" data-v="cancelled">Cancel</button></div>` : actions ? BSTAT[k.status] : BSTAT[k.status]}</td></tr>`;
+  const table = (list, actions, empty) => list.length ? `<div class="tbl-wrap"><table><thead><tr><th>Guest</th>${multi?"<th>Branch</th>":""}<th>Stay</th><th class="r">Nights</th><th class="r">To pay</th><th></th></tr></thead><tbody>${list.map(k=>row(k,actions)).join("")}</tbody></table></div>` : `<p class="muted">${empty}</p>`;
+  return `<div class="head"><div><h1>Online bookings</h1><p class="meta">Guests book at <b>www.vetuslodge.vip/book</b> and pay at the lodge on arrival.</p></div>
+    <div style="display:flex;gap:.5rem;flex-wrap:wrap"><button class="btn" data-act="refresh">Refresh</button><a class="btn" href="/book/${A.branch!=="ALL"?"?b="+A.branch:""}" target="_blank" rel="noopener">Open booking page</a></div></div>
+  <div class="kpis">
+    <div class="kpi"><div class="l">Arriving today</div><div class="v">${due.length}</div><div class="s">${due.length?K(due.reduce((a,k)=>a+Number(k.amount),0))+" expected":"None due"}</div></div>
+    <div class="kpi"><div class="l">Next 7 days</div><div class="v">${exp.length}</div><div class="s">${K(exp.reduce((a,k)=>a+Number(k.amount),0))} expected</div></div>
+    <div class="kpi"><div class="l">All upcoming</div><div class="v">${next.length}</div><div class="s">${next.reduce((a,k)=>a+k.nights,0)} room-nights held</div></div>
+  </div>
+  <section class="panel"><h2>Arriving today</h2>${table(due, true, "No booked guests due today.")}
+    <p class="small muted">When the guest arrives: issue the card in DS668, then tap <b>Check in</b> and enter the room. The stay then appears on Today for payment.</p></section>
+  <section class="panel"><h2>Upcoming</h2>${table(next, false, "No upcoming bookings yet.")}</section>
+  ${done.length?`<section class="panel"><h2>Recently handled</h2>${table(done, false, "")}</section>`:""}`;
 }
 
 /* Deposits table */
@@ -293,6 +329,8 @@ function overviewView(){
   const pend = A.D.waivers.filter(w=>w.status==="pending").length;
   const alerts = [];
   per.forEach(({s,m})=>{ if (m.overdue) alerts.push(["bad",`<b>${esc(s.name)}</b>: ${m.overdue} deposit${m.overdue>1?"s":""} not paid by 10:00 (${K(m.outstanding)}).`]); });
+  const arr = arrivalsToday("ALL").filter(k=>ids.includes(k.branch_id));
+  if (arr.length) alerts.push(["warn",`${arr.length} online booking${arr.length>1?"s":""} arriving today (${K(arr.reduce((a,k)=>a+Number(k.amount),0))} expected). <button class="btn small" data-act="tab" data-tab="bookings">View</button>`]);
   if (pend) alerts.push(["warn",`${pend} waiver${pend>1?"s":""} awaiting director confirmation. <button class="btn small" data-act="tab" data-tab="waivers">Review</button>`]);
   const card = ({s,j,m}) => `<section class="panel stripe ${m.overdue?"bad":m.outstanding?"warn":"ok"}">
     <div class="panel-h"><h2>${esc(s.name)}</h2><span class="small muted">${s.room_count} rooms</span></div>
@@ -378,9 +416,11 @@ function adminView(){
       <label class="f">Temporary password<input id="nu-pw" type="text" minlength="8" autocomplete="off" required></label>
       <button class="btn primary" type="submit">Add user</button></form>
     <p class="small muted">Give the person their username and temporary password in person. They must change it the first time they sign in.</p></section>`;
-  if (A.adminTab==="branches") body = `<section class="panel"><h2>Branches & room rates</h2><div class="tbl-wrap"><table><thead><tr><th>Branch</th><th class="r">Rooms</th><th class="r">Rate per night (K)</th><th>Reception number</th></tr></thead><tbody>
+  if (A.adminTab==="branches") body = `<section class="panel"><h2>Branches & room rates</h2><div class="tbl-wrap"><table><thead><tr><th>Branch</th><th class="r">Rooms</th><th class="r">Rate per night (K)</th><th>Reception number</th><th>WhatsApp for bookings</th><th>Online booking</th></tr></thead><tbody>
     ${A.branches.map(b=>`<tr><td><b>${esc(b.name)}</b></td><td class="r num">${b.room_count}</td><td class="r"><input type="number" id="rate-${b.id}" data-act="rate" data-id="${b.id}" value="${Number(b.rate)}" min="0" step="10" style="max-width:110px;text-align:right"></td>
-      <td><input type="text" id="sim-${b.id}" data-act="sim" data-id="${b.id}" value="${esc(b.reception_number||"")}" placeholder="09xx xxx xxx" style="max-width:160px"></td></tr>`).join("")}
+      <td><input type="text" id="sim-${b.id}" data-act="sim" data-id="${b.id}" value="${esc(b.reception_number||"")}" placeholder="09xx xxx xxx" style="max-width:160px"></td>
+      <td><input type="text" data-act="wa" data-id="${b.id}" value="${esc(b.whatsapp_number||"")}" placeholder="Same as reception" style="max-width:160px"></td>
+      <td><select data-act="bkOpen" data-id="${b.id}" style="max-width:120px"><option value="1" ${b.booking_open?"selected":""}>Open</option><option value="0" ${b.booking_open?"":"selected"}>Closed</option></select></td></tr>`).join("")}
     </tbody></table></div><p class="small muted">A new rate applies to check-ins from now on. Rates are still the DS668 default of K199 until you set the real ones.</p></section>`;
   if (A.adminTab==="sync") body = `<section class="panel"><h2>DS668 sync</h2><div class="tbl-wrap"><table><thead><tr><th>Branch</th><th>Status</th><th>Latest DS668 guest</th></tr></thead><tbody>
     ${A.branches.map(b=>{ const s=A.D.sync.find(x=>x.branch_id===b.id); return `<tr><td><b>${esc(b.name)}</b></td><td class="small">${syncLine(b.id)}</td><td class="num">${s?("#"+s.last_ds_guest_id):"–"}</td></tr>`; }).join("")}
@@ -433,6 +473,10 @@ function modalView(){
       ${m.ref?`<p class="small muted">${fmtDay(m.k)} is now deposited and locked. Demo mode: no real money moved.</p><div class="actions"><button class="btn primary" data-act="close">Done</button></div>`:m.err?`<div class="actions"><button class="btn" data-act="close">Close</button></div>`:""}
     </div></div>`;
   }
+  if (m.type==="bkCheckin"){ const k = A.D.bookings.find(x=>x.id===m.id); return wrap(`<h2>Check in ${esc(k.guest_name)}</h2>
+    <p class="muted small">${esc(k.ref)} · ${fmtDay(k.arrive)} → ${fmtDay(k.depart)} · ${K(k.amount)}. Issue the guest card in DS668 first, then enter the room it opens.</p>
+    <label class="f">Room number<input id="bk-room" type="text" inputmode="numeric" required></label>
+    <div class="actions"><button type="button" class="btn" data-act="close">Cancel</button><button class="btn primary" type="submit">Check in</button></div>`, "bkForm"); }
   if (m.type==="resetPw"){ const p = A.D.profiles.find(x=>x.id===m.id); return wrap(`<h2>Reset password · ${esc(p.full_name)}</h2>
     <label class="f">New temporary password (at least 8 characters)<input id="r-pw" type="text" minlength="8" autocomplete="off" required></label>
     <p class="small muted">They will be asked to choose their own password when they next sign in.</p>
@@ -486,6 +530,8 @@ document.addEventListener("click", async e=>{
         const d = await sb.rpc("record_test_deposit",{p_branch:A.branch, p_date:k, p_reference:ref}); if (d.error) throw d.error;
         await new Promise(r=>setTimeout(r,900)); m.ref = ref; await loadData(); render();
       } catch(err){ m.err = err.message||String(err); render(); } }
+    if (a==="bkCheckin"){ A.modal={type:"bkCheckin", id}; render(); }
+    if (a==="bkStatus"){ const { error } = await sb.rpc("booking_set_status",{p_booking:id, p_status:b.dataset.v}); if (error) throw error; await refresh(); toast(b.dataset.v==="no_show"?"Marked as no-show":"Booking cancelled"); }
     if (a==="demoSamples"){ const { data, error } = await sb.rpc("demo_add_samples",{p_branch:A.branch}); if (error) throw error; await refresh(); toast(data+" sample guests added. Record how each one paid."); }
     if (a==="pay"){ const { error } = await sb.rpc("record_payment",{p_checkin:id, p_method:b.dataset.v}); if (error) throw error; await refresh(); }
     if (a==="wdecide"){ const { error } = await sb.rpc("decide_waiver",{p_waiver:id, p_decision:b.dataset.v}); if (error) throw error; await refresh(); toast(b.dataset.v==="confirmed"?"Waiver confirmed":"Waiver disputed. The manager and owner can see it."); }
@@ -499,6 +545,8 @@ document.addEventListener("change", async e=>{
     if (t.dataset.act==="rate"){ const v = Math.max(0, Number(t.value)||0); const { error } = await sb.from("branches").update({rate:v}).eq("id", t.dataset.id); if (error) throw error; await refresh(); toast(site(t.dataset.id).name+" rate set to "+K(v)); }
     if (t.dataset.act==="lipilaMode"){ const { error } = await sb.from("branches").update({lipila_mode:t.value}).eq("id", t.dataset.id); if (error) throw error; await refresh(); toast(site(t.dataset.id).name+": Lipila "+(t.value==="demo"?"demo mode on":"off")); }
     if (t.dataset.act==="gTab"){ A.guide.tab=t.value; A.guide.loaded=false; render(); await refreshGuide(); }
+    if (t.dataset.act==="wa"){ const { error } = await sb.from("branches").update({whatsapp_number:t.value.trim()||null}).eq("id", t.dataset.id); if (error) throw error; await refresh(); toast("WhatsApp number saved"); }
+    if (t.dataset.act==="bkOpen"){ const { error } = await sb.from("branches").update({booking_open:t.value==="1"}).eq("id", t.dataset.id); if (error) throw error; await refresh(); toast(site(t.dataset.id).name+": online booking "+(t.value==="1"?"open":"closed")); }
     if (t.dataset.act==="sim"){ const { error } = await sb.from("branches").update({reception_number:t.value.trim()||null}).eq("id", t.dataset.id); if (error) throw error; await refresh(); toast("Reception number saved"); }
   } catch(err){ fail(err); }
 });
@@ -536,6 +584,11 @@ document.addEventListener("submit", async e=>{
       const { error } = await sb.rpc("record_test_deposit",{p_branch:A.branch, p_date:A.modal.k, p_reference:document.getElementById("d-ref").value});
       if (error) return setErr(error.message);
       A.modal=null; await refresh(); toast("Deposit recorded");
+    }
+    if (f==="bkForm"){
+      const { error } = await sb.rpc("booking_checkin",{p_booking:A.modal.id, p_room:document.getElementById("bk-room").value});
+      if (error) return setErr(error.message);
+      A.modal=null; await refresh(); toast("Checked in. Record how they paid on Today.");
     }
     if (f==="resetForm"){
       try { await adminCall({action:"reset", id:A.modal.id, password:document.getElementById("r-pw").value}); } catch(err){ return setErr(err.message); }
