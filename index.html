@@ -103,6 +103,22 @@ form.inline{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr)
 label.f{display:grid;gap:.25rem;font-size:.82rem;font-weight:600;color:var(--muted)}
 textarea{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:.45rem .6rem;width:100%;min-height:9rem;resize:vertical;line-height:1.45}
 a.btn{text-decoration:none;color:inherit}
+.pos{display:grid;grid-template-columns:1fr 360px;gap:1rem;align-items:start}
+@media (max-width:860px){.pos{grid-template-columns:1fr}}
+.chips{display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:.8rem}
+.chips button{font:inherit;font-size:.85rem;font-weight:700;border:1px solid var(--line);background:var(--surface);color:inherit;padding:.3rem .75rem;border-radius:99px;cursor:pointer}
+.chips button[aria-pressed="true"]{background:var(--brand-2);color:#fff;border-color:var(--brand-2)}
+.items{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:.5rem}
+.item{position:relative;font:inherit;text-align:left;border:1px solid var(--line);background:var(--surface);color:inherit;border-radius:10px;padding:.65rem .7rem;cursor:pointer;display:grid;gap:.15rem;min-height:84px}
+.item:hover{border-color:var(--green)}
+.item:active{transform:scale(.98)}
+.item .qty{position:absolute;top:.4rem;right:.4rem;background:var(--green);color:#fff;font-weight:800;font-size:.8rem;min-width:1.5rem;height:1.5rem;border-radius:99px;display:grid;place-items:center}
+.cart{position:sticky;top:.8rem;display:grid;gap:.6rem}
+.lines{display:grid;gap:.45rem}
+.line{display:grid;grid-template-columns:1fr auto auto;gap:.5rem;align-items:center}
+.paybtns{display:grid;grid-template-columns:1fr 1fr;gap:.5rem}
+.paybtns .btn{justify-content:center;padding:.8rem}
+
 .modal.wide{max-width:640px}
 .gb{display:grid;grid-template-columns:auto 1fr auto;gap:.4rem .8rem;align-items:start;padding:.7rem 0;border-top:1px solid var(--line)}
 .gb .k{font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);min-width:5.5rem;padding-top:.15rem}
@@ -142,6 +158,7 @@ input[type=text],input[type=number],input[type=password],select{border:1px solid
 <body>
 <div id="app"></div>
 <script src="supabase.js"></script>
+<script src="bar.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

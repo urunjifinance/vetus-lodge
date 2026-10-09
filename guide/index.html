@@ -112,13 +112,14 @@ footer{color:var(--muted);font-size:.85rem;border-top:1px solid var(--line);padd
 <nav class="roles" aria-label="Choose your role"><div class="wrap" role="tablist">
   <button role="tab" id="t-start" aria-controls="p-start" aria-selected="true">Getting started</button>
   <button role="tab" id="t-rec" aria-controls="p-rec" aria-selected="false">Reception</button>
+  <button role="tab" id="t-bar" aria-controls="p-bar" aria-selected="false">Bar & restaurant</button>
   <button role="tab" id="t-mgr" aria-controls="p-mgr" aria-selected="false">Manager</button>
   <button role="tab" id="t-dir" aria-controls="p-dir" aria-selected="false">Directors</button>
   <button role="tab" id="t-adm" aria-controls="p-adm" aria-selected="false">System admin</button>
   <button role="tab" id="t-help" aria-controls="p-help" aria-selected="false">Rules & help</button>
 </div></nav>
 
-<main class="wrap"><section role="tabpanel" id="p-start" aria-labelledby="t-start"><p class="muted">Loading…</p></section><section role="tabpanel" id="p-rec" aria-labelledby="t-rec" hidden><p class="muted">Loading…</p></section><section role="tabpanel" id="p-mgr" aria-labelledby="t-mgr" hidden><p class="muted">Loading…</p></section><section role="tabpanel" id="p-dir" aria-labelledby="t-dir" hidden><p class="muted">Loading…</p></section><section role="tabpanel" id="p-adm" aria-labelledby="t-adm" hidden><p class="muted">Loading…</p></section><section role="tabpanel" id="p-help" aria-labelledby="t-help" hidden><p class="muted">Loading…</p></section>
+<main class="wrap"><section role="tabpanel" id="p-start" aria-labelledby="t-start"><p class="muted">Loading…</p></section><section role="tabpanel" id="p-rec" aria-labelledby="t-rec" hidden><p class="muted">Loading…</p></section><section role="tabpanel" id="p-bar" aria-labelledby="t-bar" hidden><p class="muted">Loading…</p></section><section role="tabpanel" id="p-mgr" aria-labelledby="t-mgr" hidden><p class="muted">Loading…</p></section><section role="tabpanel" id="p-dir" aria-labelledby="t-dir" hidden><p class="muted">Loading…</p></section><section role="tabpanel" id="p-adm" aria-labelledby="t-adm" hidden><p class="muted">Loading…</p></section><section role="tabpanel" id="p-help" aria-labelledby="t-help" hidden><p class="muted">Loading…</p></section>
 <footer>Vetus Lodge · Mumbwa · Kaoma · Kasempa. System by Urunji Innovations. Support: Kalaluka Sydney Nawa.</footer></main>
 <script src="../supabase.js"></script>
 <script src="../guide-render.js"></script>
@@ -126,7 +127,7 @@ footer{color:var(--muted);font-size:.85rem;border-top:1px solid var(--line);padd
 (async function(){
   const sb = supabase.createClient("https://csmtjttaeibqesgymxfs.supabase.co","sb_publishable_t1AeDZDr6_czlrU4NxWZNw_ri712Jnr");
   const { data, error } = await sb.from("guide_blocks").select("tab,position,kind,title,body").order("tab").order("position");
-  for (const k of ["start","rec","mgr","dir","adm","help"]){
+  for (const k of ["start","rec","bar","mgr","dir","adm","help"]){
     const el = document.getElementById("p-"+k);
     if (error){ el.innerHTML = '<p class="muted">The guide could not load. Check your internet connection and refresh.</p>'; continue; }
     const rows = data.filter(b=>b.tab===k);

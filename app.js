@@ -11,7 +11,8 @@ const dayKey = d => new Intl.DateTimeFormat("en-CA",{timeZone:TZ}).format(new Da
 const addDaysKey = (key, n) => { const d = new Date(key+"T12:00:00Z"); d.setUTCDate(d.getUTCDate()+n); return d.toISOString().slice(0,10); };
 const fmtDay = key => new Date(key+"T12:00:00Z").toLocaleDateString("en-GB",{weekday:"short",day:"numeric",month:"short",timeZone:"UTC"});
 const fmtTime = d => new Date(d).toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit",timeZone:TZ});
-const ROLES = {reception:"Reception", manager:"Manager", director:"Director", admin:"System admin"};
+const ROLES = {reception:"Reception", bar:"Bar & restaurant", manager:"Manager", director:"Director", admin:"System admin"};
+const branchRole = r => r==="reception" || r==="bar";
 const pct = v => v==null || !isFinite(v) ? "–" : Math.round(v*100)+"%";
 
 const A = {me:null, branches:[], branch:null, tab:null, period:"week", modal:null, toast:null, err:"", busy:false, adminTab:"users", guide:{tab:"start", rows:[], loaded:false},
@@ -60,6 +61,7 @@ async function loadData(){
   A.D.waivers = [];
   if (cids.length){ const w = await sb.from("waivers").select("*").in("checkin_id", cids); if (w.error) throw w.error; A.D.waivers = w.data; }
   if (["admin","manager","director"].includes(A.me.role)){ const p = await sb.from("profiles").select("*").order("full_name"); A.D.profiles = p.data||[]; }
+  if (A.me.role!=="reception") await barLoad(ids);
   const b = await sb.from("branches").select("*").order("name"); A.branches = b.data || A.branches;
   A.loaded = true;
 }
@@ -128,7 +130,7 @@ const payPill = k => k.pay_option!=="now" ? '<span class="pill neutral">Pays at 
 /* ---------- Views: auth ---------- */
 function topBar(){
   const br = !A.branch ? "None" : A.branch==="ALL" ? "All branches" : site(A.branch).name;
-  const multi = A.me && (A.me.role!=="reception");
+  const multi = A.me && !branchRole(A.me.role);
   return `<div class="bar-in"><img src="logo.jpg" alt="Vetus Lodge logo">
     <div><div class="name">Vetus Lodge</div><div class="sub">Daily Sales</div></div><div class="spacer"></div>
     <div class="who small"><span>Role: <b>${A.me?ROLES[A.me.role]:"None"}</b></span><span>Branch: <b>${esc(br)}</b></span>
@@ -160,14 +162,14 @@ function changePwView(){
   </form></div></div>`;
 }
 function branchPicker(){
-  const ids = A.me.role==="reception" ? [A.me.branch_id] : A.branches.map(b=>b.id);
+  const ids = branchRole(A.me.role) ? [A.me.branch_id] : A.branches.map(b=>b.id);
   return `<header class="bar">${topBar()}</header><main>
   <div class="head"><div><h1>Select active branch</h1><p class="meta">Choose a branch to see its check-ins, payments and deposits.</p></div></div>
   <div class="grid3">${ids.map(id=>{ const s=site(id); return `<button type="button" class="panel branch" data-act="pickBranch" data-id="${id}">
     <span style="font-family:var(--f-display);font-weight:800;font-size:1.15rem">${esc(s.name)}</span>
     <span class="small muted">${s.room_count} rooms · ${K(s.rate)} per night</span>
     <span class="small" style="color:var(--green);font-weight:700">Open ${esc(s.name)} →</span></button>`; }).join("")}
-  ${A.me.role!=="reception"?`<button type="button" class="panel branch" data-act="pickBranch" data-id="ALL" style="background:var(--brand-2);color:#fff;border-color:var(--gold-line)">
+  ${!branchRole(A.me.role)?`<button type="button" class="panel branch" data-act="pickBranch" data-id="ALL" style="background:var(--brand-2);color:#fff;border-color:var(--gold-line)">
     <span style="font-family:var(--f-display);font-weight:800;font-size:1.15rem">All branches</span>
     <span class="small" style="opacity:.85">Business overview: each branch, then the whole business.</span>
     <span class="small" style="font-weight:700;color:var(--gold-line)">Open overview →</span></button>`:""}
@@ -177,9 +179,10 @@ function branchPicker(){
 /* ---------- Shell + tabs ---------- */
 function tabsFor(){
   const r = A.me.role;
-  if (A.branch==="ALL") return r==="admin" ? [["dash","Overview"],["bookings","Bookings"],["deposits","Deposits"],["waivers","Waivers"],["admin","Settings"]] : [["dash","Overview"],["bookings","Bookings"],["deposits","Deposits"],["waivers","Waivers"]];
+  if (r==="bar") return [["sell","Sell"],["bardeposit","Deposit"],["barsales","Sales"]];
+  if (A.branch==="ALL") return r==="admin" ? [["dash","Overview"],["bookings","Bookings"],["deposits","Deposits"],["waivers","Waivers"],["bar","Bar"],["admin","Settings"]] : [["dash","Overview"],["bookings","Bookings"],["deposits","Deposits"],["waivers","Waivers"],["bar","Bar"]];
   if (r==="reception") return [["today","Today"],["bookings","Bookings"],["deposit","Deposit"],["deposits","History"]];
-  const t = [["today","Today"],["bookings","Bookings"],["deposit","Deposit"],["deposits","Deposits"],["waivers","Waivers"]];
+  const t = [["today","Today"],["bookings","Bookings"],["deposit","Deposit"],["deposits","Deposits"],["waivers","Waivers"],["bar","Bar"],...(r!=="director"?[["sell","Sell"],["bardeposit","Bar deposit"]]:[])];
   return r==="admin" ? [...t,["admin","Settings"]] : t;
 }
 function shell(){
@@ -197,6 +200,10 @@ function view(){
   if (t==="deposits") return depositsView();
   if (t==="waivers") return waiversView();
   if (t==="bookings") return bookingsView();
+  if (t==="sell") return sellView();
+  if (t==="bardeposit") return barDepositView();
+  if (t==="barsales") return barSalesView();
+  if (t==="bar") return barManageView();
   if (t==="dash" || A.branch==="ALL") return overviewView();
   if (t==="deposit") return depositView();
   return todayView();
@@ -364,6 +371,7 @@ function overviewView(){
   const alerts = [];
   per.forEach(({s,m})=>{ if (m.overdue) alerts.push(["bad",`<b>${esc(s.name)}</b>: ${m.overdue} deposit${m.overdue>1?"s":""} not paid by 10:00 (${K(m.outstanding)}).`]); });
   const arr = arrivalsToday("ALL").filter(k=>ids.includes(k.branch_id));
+  per.forEach(({s})=>{ const bm = barPeriod(s.id,"week"); if (bm.overdue) alerts.push(["bad",`<b>${esc(s.name)}</b>: bar deposit not paid by 10:00 (${K(bm.outstanding)}). <button class="btn small" data-act="tab" data-tab="bar">View</button>`]); const lw = lowItems(s.id); if (lw.length) alerts.push(["warn",`<b>${esc(s.name)}</b>: ${lw.length} bar item${lw.length>1?"s":""} low on stock (${lw.slice(0,3).map(i=>esc(i.name)).join(", ")}${lw.length>3?"…":""}).`]); });
   const rq = pendingReq("ALL").filter(k=>ids.includes(k.branch_id));
   if (rq.length) alerts.push(["bad",`${rq.length} online booking request${rq.length>1?"s":""} waiting to be confirmed. <button class="btn small" data-act="tab" data-tab="bookings">Answer</button>`]);
   if (arr.length) alerts.push(["warn",`${arr.length} online booking${arr.length>1?"s":""} arriving today (${K(arr.reduce((a,k)=>a+Number(k.amount),0))} expected). <button class="btn small" data-act="tab" data-tab="bookings">View</button>`]);
@@ -377,6 +385,7 @@ function overviewView(){
       <tr><td class="muted">Occupancy</td><td class="r num">${pct(m.occ)}</td></tr>
       <tr><td class="muted">Cash · mobile</td><td class="r num">${K(m.cash)} · ${K(m.mobile)}</td></tr>
       <tr><td class="muted">Waived</td><td class="r num">${m.waived?K(m.waived):"–"}</td></tr>
+      <tr><td class="muted">Bar & restaurant</td><td class="r num">${(()=>{ const bm = barPeriod(s.id,P); return bm.total?K(bm.total)+(bm.outstanding?` <span style="color:var(--red)">(${K(bm.outstanding)} not deposited)</span>`:""):"–"; })()}</td></tr>
       <tr><td class="muted">Not yet deposited</td><td class="r num" style="${m.outstanding?"color:var(--red);font-weight:700":""}">${m.outstanding?K(m.outstanding):"–"}</td></tr>
       ${P==="week"?`<tr><td class="muted">Deposits on time</td><td class="r num">${pct(m.ontime)}</td></tr>`:`<tr><td class="muted">Payments not recorded</td><td class="r num">${m.unrecorded||"–"}</td></tr>`}
     </tbody></table></div>
@@ -387,7 +396,8 @@ function overviewView(){
   <h2>By branch</h2><div class="grid3">${per.map(card).join("")}</div>
   <h2>Overall${ids.length>1?" · all branches":""}</h2>
   <div class="kpis">
-    <div class="kpi"><div class="l">Total sales</div><div class="v">${K(tot.sales)}</div><div class="s">${label}</div></div>
+    <div class="kpi"><div class="l">Room sales</div><div class="v">${K(tot.sales)}</div><div class="s">${label}</div></div>
+    <div class="kpi"><div class="l">Bar & restaurant</div><div class="v">${K(ids.reduce((a,b)=>a+barPeriod(b,P).total,0))}</div><div class="s">separate deposit</div></div>
     <div class="kpi"><div class="l">Check-ins</div><div class="v">${tot.checkins}</div><div class="s">${tot.nights} room-nights</div></div>
     <div class="kpi"><div class="l">Occupancy</div><div class="v">${pct(occ)}</div><div class="s">${rooms} rooms</div></div>
     <div class="kpi"><div class="l">Waived</div><div class="v">${K(tot.waived)}</div><div class="s">by directors</div></div>
@@ -401,7 +411,7 @@ function overviewView(){
 }
 
 /* Guide editor */
-const GTABS = [["start","Getting started"],["rec","Reception"],["mgr","Manager"],["dir","Directors"],["adm","System admin"],["help","Rules & help"]];
+const GTABS = [["start","Getting started"],["rec","Reception"],["bar","Bar & restaurant"],["mgr","Manager"],["dir","Directors"],["adm","System admin"],["help","Rules & help"]];
 const GKINDS = {intro:"Section intro", step:"Numbered step", heading:"Sub-heading", text:"Paragraph", "note-gold":"Note (gold)", "note-green":"Tip (green)", "note-red":"Warning (red)", timeline:"Day timeline", rule:"Rule card", faq:"Question & answer"};
 async function loadGuide(){
   const { data, error } = await sb.from("guide_blocks").select("*").eq("tab", A.guide.tab).order("position");
@@ -448,13 +458,14 @@ function adminView(){
     <form id="addUser" class="inline"><label class="f">Full name<input id="nu-name" type="text" required></label>
       <label class="f">Username<input id="nu-user" type="text" placeholder="e.g. grace.mumbwa" autocapitalize="none" required></label>
       <label class="f">Role<select id="nu-role">${Object.entries(ROLES).map(([k,v])=>`<option value="${k}">${v}</option>`).join("")}</select></label>
-      <label class="f">Branch (reception only)<select id="nu-branch">${A.branches.map(b=>`<option value="${b.id}">${esc(b.name)}</option>`).join("")}</select></label>
+      <label class="f">Branch (reception and bar staff)<select id="nu-branch">${A.branches.map(b=>`<option value="${b.id}">${esc(b.name)}</option>`).join("")}</select></label>
       <label class="f">Temporary password<input id="nu-pw" type="text" minlength="8" autocomplete="off" required></label>
       <button class="btn primary" type="submit">Add user</button></form>
     <p class="small muted">Give the person their username and temporary password in person. They must change it the first time they sign in.</p></section>`;
-  if (A.adminTab==="branches") body = `<section class="panel"><h2>Branches & room rates</h2><div class="tbl-wrap"><table><thead><tr><th>Branch</th><th class="r">Rooms</th><th class="r">Rate per night (K)</th><th>Reception number</th><th>WhatsApp for bookings</th><th>Online booking</th><th class="r">Pay-now discount %</th></tr></thead><tbody>
+  if (A.adminTab==="branches") body = `<section class="panel"><h2>Branches & room rates</h2><div class="tbl-wrap"><table><thead><tr><th>Branch</th><th class="r">Rooms</th><th class="r">Rate per night (K)</th><th>Reception number</th><th>Bar number</th><th>WhatsApp for bookings</th><th>Online booking</th><th class="r">Pay-now discount %</th></tr></thead><tbody>
     ${A.branches.map(b=>`<tr><td><b>${esc(b.name)}</b></td><td class="r num">${b.room_count}</td><td class="r"><input type="number" id="rate-${b.id}" data-act="rate" data-id="${b.id}" value="${Number(b.rate)}" min="0" step="10" style="max-width:110px;text-align:right"></td>
       <td><input type="text" id="sim-${b.id}" data-act="sim" data-id="${b.id}" value="${esc(b.reception_number||"")}" placeholder="09xx xxx xxx" style="max-width:160px"></td>
+      <td><input type="text" data-act="barnum" data-id="${b.id}" value="${esc(b.bar_number||"")}" placeholder="09xx xxx xxx" style="max-width:160px"></td>
       <td><input type="text" data-act="wa" data-id="${b.id}" value="${esc(b.whatsapp_number||"")}" placeholder="Same as reception" style="max-width:160px"></td>
       <td><select data-act="bkOpen" data-id="${b.id}" style="max-width:120px"><option value="1" ${b.booking_open?"selected":""}>Open</option><option value="0" ${b.booking_open?"":"selected"}>Closed</option></select></td>
       <td class="r"><input type="number" data-act="disc" data-id="${b.id}" value="${Number(b.prepay_discount??5)}" min="0" max="50" step="1" style="max-width:80px;text-align:right"></td></tr>`).join("")}
@@ -510,6 +521,7 @@ function modalView(){
       ${m.ref?`<p class="small muted">${fmtDay(m.k)} is now deposited and locked. Demo mode: no real money moved.</p><div class="actions"><button class="btn primary" data-act="close">Done</button></div>`:m.err?`<div class="actions"><button class="btn" data-act="close">Close</button></div>`:""}
     </div></div>`;
   }
+  { const bm = barModal(m); if (bm) return bm; }
   if (m.type==="bkDecline"){ const k = A.D.bookings.find(x=>x.id===m.id); return wrap(`<h2>Decline ${esc(k.guest_name)}'s request</h2>
     <p class="muted small">${esc(k.ref)} · ${fmtDay(k.arrive)} → ${fmtDay(k.depart)}. The room is released straight away.</p>
     <label class="f">Reason for the guest (optional)<input id="bk-reason" type="text" placeholder="e.g. We are fully booked on those dates."></label>
@@ -599,6 +611,7 @@ document.addEventListener("change", async e=>{
     if (t.dataset.act==="rate"){ const v = Math.max(0, Number(t.value)||0); const { error } = await sb.from("branches").update({rate:v}).eq("id", t.dataset.id); if (error) throw error; await refresh(); toast(site(t.dataset.id).name+" rate set to "+K(v)); }
     if (t.dataset.act==="lipilaMode"){ const { error } = await sb.from("branches").update({lipila_mode:t.value}).eq("id", t.dataset.id); if (error) throw error; await refresh(); toast(site(t.dataset.id).name+": Lipila "+(t.value==="demo"?"demo mode on":"off")); }
     if (t.dataset.act==="gTab"){ A.guide.tab=t.value; A.guide.loaded=false; render(); await refreshGuide(); }
+    if (t.dataset.act==="barnum"){ const { error } = await sb.from("branches").update({bar_number:t.value.trim()||null}).eq("id", t.dataset.id); if (error) throw error; await refresh(); toast("Bar number saved"); }
     if (t.dataset.act==="wa"){ const { error } = await sb.from("branches").update({whatsapp_number:t.value.trim()||null}).eq("id", t.dataset.id); if (error) throw error; await refresh(); toast("WhatsApp number saved"); }
     if (t.dataset.act==="disc"){ const v = Math.min(50, Math.max(0, Number(t.value)||0)); const { error } = await sb.from("branches").update({prepay_discount:v}).eq("id", t.dataset.id); if (error) throw error; await refresh(); toast(site(t.dataset.id).name+": pay-now discount "+v+"%"); }
     if (t.dataset.act==="bkOpen"){ const { error } = await sb.from("branches").update({booking_open:t.value==="1"}).eq("id", t.dataset.id); if (error) throw error; await refresh(); toast(site(t.dataset.id).name+": online booking "+(t.value==="1"?"open":"closed")); }
@@ -684,7 +697,7 @@ document.addEventListener("submit", async e=>{
     if (f==="addUser"){
       const role = document.getElementById("nu-role").value;
       await adminCall({action:"create", full_name:document.getElementById("nu-name").value, username:document.getElementById("nu-user").value,
-        role, branch_id: role==="reception" ? document.getElementById("nu-branch").value : null, password:document.getElementById("nu-pw").value});
+        role, branch_id: branchRole(role) ? document.getElementById("nu-branch").value : null, password:document.getElementById("nu-pw").value});
       await refresh(); toast("Staff member added");
     }
   } catch(err){ A.busy=false; fail(err); }
