@@ -50,6 +50,14 @@ textarea{min-height:4.5rem;resize:vertical}
 .btn.go{background:var(--green)}
 .btn.ghost{background:transparent;color:var(--ink);border:1.5px solid var(--line)}
 .btn:disabled{opacity:.6;cursor:wait}
+.pays{display:grid;gap:.5rem}
+.pay{font:inherit;text-align:left;border:1.5px solid var(--line);background:var(--surface);color:var(--ink);border-radius:12px;padding:.75rem .85rem;cursor:pointer;display:grid;grid-template-columns:auto 1fr auto;gap:.2rem .7rem;align-items:center}
+.pay .dot{width:18px;height:18px;border-radius:50%;border:2px solid var(--line);grid-row:span 2}
+.pay[aria-checked="true"]{border-color:var(--green);background:var(--ok-bg)}
+.pay[aria-checked="true"] .dot{border:6px solid var(--green)}
+.pay b{font-family:var(--f-display)}
+.pay .amt{font-family:var(--f-display);font-weight:800;grid-row:span 2;text-align:right}
+.pay .save{display:inline-block;background:var(--gold);color:#14251A;font-size:.72rem;font-weight:800;padding:.05rem .45rem;border-radius:99px;margin-left:.3rem}
 .quote{border-radius:12px;padding:.9rem 1rem;display:grid;gap:.35rem}
 .quote.ok{background:var(--ok-bg)}
 .quote.bad{background:var(--bad-bg)}
@@ -71,7 +79,7 @@ footer a{color:inherit}
   <img src="../logo.jpg" alt="Vetus Lodge logo">
   <div class="eyebrow">Mumbwa · Kaoma · Kasempa</div>
   <h1>Book your stay at Vetus Lodge</h1>
-  <p>Reserve a room in under a minute. You pay at the lodge when you arrive.</p>
+  <p>Request a room in under a minute. Pay at the lodge, or pay now and save.</p>
 </div></header>
 <main class="wrap"><div class="card" id="app" aria-live="polite"><p class="muted"><span class="spin" style="display:inline-block;vertical-align:-2px"></span> Loading…</p></div></main>
 <footer>Check-out is at 10:00. Questions? Contact the lodge on WhatsApp after booking.<br>Staff? <a href="../">Sign in to the app</a></footer>
@@ -86,10 +94,10 @@ const nice = k => new Date(k+"T12:00:00Z").toLocaleDateString("en-GB",{weekday:"
 const waNum = s => { let d = String(s||"").replace(/\D/g,""); if (!d) return ""; if (d.startsWith("0")) d = "260" + d.slice(1); else if (d.length === 9) d = "260" + d; return d; };
 const errMsg = e => (e && e.message) ? e.message : "Something went wrong. Please try again.";
 
-const S = { step:1, branches:[], branch:new URLSearchParams(location.search).get("b"), arrive:todayKey(), depart:addDays(todayKey(),1), guests:1, quote:null, busy:false, err:"", done:null, form:{name:"",phone:"",email:"",note:""} };
+const S = { step:1, branches:[], branch:new URLSearchParams(location.search).get("b"), arrive:todayKey(), depart:addDays(todayKey(),1), guests:1, quote:null, pay:"lodge", busy:false, err:"", done:null, form:{name:"",phone:"",email:"",note:""} };
 const $app = document.getElementById("app");
 
-function stepsBar(){ return `<div class="steps" aria-hidden="true">${["Your stay","Your details","Confirmed"].map((t,i)=>`<span class="${S.step===i+1?"on":""}">${i+1}. ${t}</span>`).join("")}</div>`; }
+function stepsBar(){ return `<div class="steps" aria-hidden="true">${["Your stay","Your details","Sent"].map((t,i)=>`<span class="${S.step===i+1?"on":""}">${i+1}. ${t}</span>`).join("")}</div>`; }
 function render(){
   if (S.step===3) return renderDone();
   if (S.step===2) return renderDetails();
@@ -106,7 +114,7 @@ function render(){
   ${S.quote ? quoteBox() : ""}
   ${S.err?`<p class="err">${esc(S.err)}</p>`:""}
   ${S.quote && S.quote.free>0
-    ? `<button class="btn go" data-act="next">Continue · ${K(S.quote.amount)} for ${S.quote.nights} night${S.quote.nights>1?"s":""}</button>`
+    ? `<button class="btn go" data-act="next">Continue · ${K(chosen())} for ${S.quote.nights} night${S.quote.nights>1?"s":""}</button>`
     : `<button class="btn" data-act="check" ${!b||S.busy?"disabled":""}>${S.busy?'<span class="spin"></span> Checking':"Check availability"}</button>`}
   ${!b?'<p class="small muted">Choose a branch to continue.</p>':""}`;
 }
@@ -116,45 +124,52 @@ function quoteBox(){
   return `<div class="quote ok"><b>✓ Rooms available at ${esc(q.branch)}</b>
     <div class="sum small"><span>${nice(S.arrive)} → ${nice(S.depart)}</span><span class="v">${q.nights} night${q.nights>1?"s":""}</span></div>
     <div class="sum small"><span>${K(q.rate)} × ${q.nights}</span><span class="v">${K(q.amount)}</span></div>
-    <div class="sum"><span class="total">Total</span><span class="total">${K(q.amount)}</span></div>
-    <span class="small muted">Pay at the lodge on arrival, by cash or mobile money. Nothing to pay now.</span></div>`;
+    </div>
+  <div><span class="lbl" id="pl">How would you like to pay?</span><div class="pays" role="radiogroup" aria-labelledby="pl">
+    <button class="pay" role="radio" data-pay="lodge" aria-checked="${S.pay==="lodge"}"><span class="dot"></span><b>Pay at the lodge</b><span class="amt">${K(q.amount)}</span><small class="muted">Cash or mobile money when you arrive</small></button>
+    <button class="pay" role="radio" data-pay="now" aria-checked="${S.pay==="now"}"><span class="dot"></span><b>Pay now by mobile money <span class="save">Save ${Number(q.discount_pct)}%</span></b><span class="amt">${K(q.pay_now_amount)}</span><small class="muted">Pay after the lodge confirms your room · save ${K(q.amount-q.pay_now_amount)}</small></button>
+  </div></div>`;
 }
+const chosen = () => S.pay==="now" ? S.quote.pay_now_amount : S.quote.amount;
 function renderDetails(){
   const q = S.quote, f = S.form;
   $app.innerHTML = `${stepsBar()}
-  <div class="quote ok small"><div class="sum"><b>${esc(q.branch)} · ${q.nights} night${q.nights>1?"s":""}</b><b>${K(q.amount)}</b></div><span>${nice(S.arrive)} → ${nice(S.depart)} · ${S.guests} guest${S.guests>1?"s":""}</span></div>
+  <div class="quote ok small"><div class="sum"><b>${esc(q.branch)} · ${q.nights} night${q.nights>1?"s":""}</b><b>${K(chosen())}</b></div><span>${nice(S.arrive)} → ${nice(S.depart)} · ${S.guests} guest${S.guests>1?"s":""}</span><span>${S.pay==="now"?`Pay now by mobile money (${Number(q.discount_pct)}% off). Payment details come with your confirmation.`:"Pay at the lodge on arrival."}</span></div>
   <form id="details" style="display:grid;gap:.9rem" novalidate>
     <label><span class="lbl">Full name</span><input id="name" autocomplete="name" required value="${esc(f.name)}"></label>
-    <label><span class="lbl">Phone number</span><input id="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="e.g. 0977 123 456" required value="${esc(f.phone)}"></label>
-    <label><span class="lbl">Email <span class="muted" style="font-weight:400">(optional)</span></span><input id="email" type="email" autocomplete="email" value="${esc(f.email)}"></label>
+    <label><span class="lbl">Phone number <span class="muted" style="font-weight:400">(WhatsApp if possible)</span></span><input id="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="e.g. 0977 123 456" required value="${esc(f.phone)}"></label>
+    <label><span class="lbl">Email <span class="muted" style="font-weight:400">(optional, for your confirmation)</span></span><input id="email" type="email" autocomplete="email" value="${esc(f.email)}"></label>
     <label><span class="lbl">Anything we should know? <span class="muted" style="font-weight:400">(optional)</span></span><textarea id="note" maxlength="300" placeholder="e.g. arriving late, about 21:00">${esc(f.note)}</textarea></label>
     ${S.err?`<p class="err">${esc(S.err)}</p>`:""}
-    <button class="btn go" type="submit" ${S.busy?"disabled":""}>${S.busy?'<span class="spin"></span> Booking':"Confirm booking"}</button>
+    <button class="btn go" type="submit" ${S.busy?"disabled":""}>${S.busy?'<span class="spin"></span> Sending':"Send booking request"}</button>
     <button class="btn ghost" type="button" data-act="back">Back</button>
     <p class="small muted">By booking you agree the lodge may contact you on this number about your stay.</p>
   </form>`;
 }
 function renderDone(){
-  const d = S.done, b = S.branches.find(x=>x.id===S.branch) || {}, wa = waNum(b.whatsapp);
-  const msg = `Hello Vetus Lodge ${d.branch}, I have booked online.\nRef: ${d.ref}\nName: ${d.name}\nCheck-in: ${nice(S.arrive)}\nCheck-out: ${nice(S.depart)}\nNights: ${d.nights}\nTotal: ${K(d.amount)} (pay on arrival)`;
+  const d = S.done, b = S.branches.find(x=>x.id===S.branch) || {}, wa = waNum(b.whatsapp), now = d.pay_option==="now";
+  const due = now ? d.pay_now_amount : d.amount;
+  const msg = `Hello Vetus Lodge ${d.branch}, I have sent a booking request online.\nRef: ${d.ref}\nName: ${d.name}\nCheck-in: ${nice(S.arrive)}\nCheck-out: ${nice(S.depart)}\nNights: ${d.nights}\n${now?`I would like to pay now: ${K(due)} (${Number(d.discount_pct)}% off)`:`I will pay ${K(due)} at the lodge`}`;
   $app.innerHTML = `${stepsBar()}
   <div class="tick" aria-hidden="true">✓</div>
-  <div style="text-align:center"><h2>You're booked, ${esc(d.name.split(" ")[0])}!</h2><p class="muted" style="margin-top:.3rem">Show this reference at reception when you arrive.</p></div>
+  <div style="text-align:center"><h2>Request sent, ${esc(d.name.split(" ")[0])}!</h2><p class="muted" style="margin-top:.3rem">The lodge will check the room and confirm on WhatsApp${S.lastEmail?" and email":""}. Keep this reference.</p></div>
   <div class="ref" aria-label="Booking reference">${esc(d.ref)}</div>
   <div class="quote ok small">
     <div class="sum"><span>Branch</span><b>Vetus Lodge ${esc(d.branch)}</b></div>
     <div class="sum"><span>Check-in</span><b>${nice(S.arrive)}</b></div>
     <div class="sum"><span>Check-out</span><b>${nice(S.depart)}, 10:00</b></div>
     <div class="sum"><span>Guests</span><b>${S.guests}</b></div>
-    <div class="sum"><span class="total">To pay on arrival</span><span class="total">${K(d.amount)}</span></div>
+    <div class="sum"><span class="total">${now?"To pay now":"To pay on arrival"}</span><span class="total">${K(due)}</span></div>
+    ${now?`<span>You save ${K(d.amount-due)}. Mobile money details come with your confirmation, so please don't pay until then. If you would rather pay at the lodge, the full price is ${K(d.amount)}.</span>`:""}
   </div>
-  ${wa?`<a class="btn go" href="https://wa.me/${wa}?text=${encodeURIComponent(msg)}" target="_blank" rel="noopener">Send booking to the lodge on WhatsApp</a>`:""}
+  ${wa?`<a class="btn go" href="https://wa.me/${wa}?text=${encodeURIComponent(msg)}" target="_blank" rel="noopener">Message the lodge on WhatsApp</a>`:""}
   <button class="btn ghost" data-act="again">Make another booking</button>
   <p class="small muted" style="text-align:center">Take a screenshot of this page to keep your reference.</p>`;
 }
 
 document.addEventListener("click", async e=>{
-  const t = e.target.closest("[data-b],[data-act]"); if (!t) return;
+  const t = e.target.closest("[data-b],[data-act],[data-pay]"); if (!t) return;
+  if (t.dataset.pay){ S.pay=t.dataset.pay; render(); return; }
   if (t.dataset.b){ S.branch=t.dataset.b; S.quote=null; S.err=""; history.replaceState(null,"","?b="+S.branch); render(); return; }
   const a = t.dataset.act;
   if (a==="check"){ readStay(); S.busy=true; S.err=""; S.quote=null; render();
@@ -175,17 +190,17 @@ document.addEventListener("submit", async e=>{
   if (S.form.name.trim().length<2) { S.err="Please enter your full name."; return render(); }
   if (S.form.phone.replace(/\D/g,"").length<9) { S.err="Please enter a valid phone number."; return render(); }
   S.busy=true; S.err=""; render();
-  const { data, error } = await sb.rpc("create_booking",{p_branch:S.branch, p_arrive:S.arrive, p_depart:S.depart, p_guests:Number(S.guests),
-    p_name:S.form.name, p_phone:S.form.phone, p_email:S.form.email||null, p_note:S.form.note||null});
+  const { data, error } = await sb.rpc("request_booking",{p_branch:S.branch, p_arrive:S.arrive, p_depart:S.depart, p_guests:Number(S.guests),
+    p_name:S.form.name, p_phone:S.form.phone, p_email:S.form.email||null, p_note:S.form.note||null, p_pay_option:S.pay});
   S.busy=false;
   if (error){ S.err = errMsg(error); return render(); }
-  S.done = data; S.step=3; S.form={name:"",phone:"",email:"",note:""}; render(); window.scrollTo({top:0,behavior:"smooth"});
+  S.lastEmail = !!S.form.email; S.done = data; S.step=3; S.form={name:"",phone:"",email:"",note:""}; render(); window.scrollTo({top:0,behavior:"smooth"});
 });
 function readStay(){ const g=id=>document.getElementById(id); if (g("arrive")){ S.arrive=g("arrive").value||S.arrive; S.depart=g("depart").value||S.depart; S.guests=g("guests").value; } }
 function readForm(){ const g=id=>(document.getElementById(id)||{}).value||""; S.form={name:g("name"),phone:g("phone"),email:g("email"),note:g("note")}; }
 
 (async function(){
-  const { data, error } = await sb.rpc("public_branches");
+  const { data, error } = await sb.rpc("booking_branches");
   if (error){ $app.innerHTML = `<p class="err">Booking is not available right now. Please try again later.</p>`; return; }
   S.branches = data;
   if (!S.branches.some(b=>b.id===S.branch && b.booking_open)) S.branch = null;
